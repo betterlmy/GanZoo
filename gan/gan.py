@@ -1,21 +1,19 @@
 import argparse
 import numpy as np
-
 from torchvision.utils import save_image
-from torchvision import datasets, transforms
+from torchvision import transforms
+from torch.utils.data import Dataset
 
-from torch.utils.data import DataLoader
-from torchvision import datasets
 from torch.autograd import Variable
 
 import torch.nn as nn
 import torch
 
-# os.makedirs("images", exist_ok=True)
+from utils.CustomDataset import CustomDataset
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
+parser.add_argument("--n_epochs", type=int, default=2000, help="number of epochs of training")
+parser.add_argument("--batch_size", type=int, default=128, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
@@ -40,7 +38,7 @@ class Generator(nn.Module):
             layers = [nn.Linear(in_feat, out_feat)]
             if normalize:
                 layers.append(nn.BatchNorm1d(out_feat, 0.8))
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            layers.append(nn.LeakyReLU(0.1, inplace=True))
             return layers
 
         self.model = nn.Sequential(
@@ -74,7 +72,6 @@ class Discriminator(nn.Module):
     def forward(self, img):
         img_flat = img.view(img.size(0), -1)
         validity = self.model(img_flat)
-
         return validity
 
 
@@ -105,6 +102,7 @@ if cuda:
 #     shuffle=True,
 # )
 
+
 transform = transforms.Compose([
     # transforms.Grayscale(),  # 如果图像不是灰度图像，请添加此行
     transforms.Resize((opt.img_size, opt.img_size)),
@@ -112,7 +110,8 @@ transform = transforms.Compose([
     transforms.Normalize([0.5], [0.5])
 ])
 
-dataset = datasets.ImageFolder(root='dataset/celeba/high_gray', transform=transform)
+dataset = CustomDataset(image_dir=r'C:\Users\Eon\PycharmProjects\GanZoo\dataset\celeba\high_gray',
+                        transform=transform)
 
 dataloader = torch.utils.data.DataLoader(
     dataset,
@@ -130,9 +129,9 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 # ----------
 #  Training
 # ----------
-def train():
+def train(out_path="output"):
     for epoch in range(opt.n_epochs):
-        for i, (imgs, _) in enumerate(dataloader):
+        for i, imgs in enumerate(dataloader):
 
             # Adversarial ground truths
             valid = Variable(Tensor(imgs.size(0), 1).fill_(1.0), requires_grad=False)
@@ -180,8 +179,8 @@ def train():
 
             batches_done = epoch * len(dataloader) + i
             if batches_done % opt.sample_interval == 0:
-                save_image(gen_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
+                save_image(gen_imgs.data[:25], out_path + "%d.png" % batches_done, nrow=5, normalize=True)
 
 
 if __name__ == '__main__':
-    train()
+    train(r"C:\\Users\\Eon\\PycharmProjects\\GanZoo\\gan\\output\\")
