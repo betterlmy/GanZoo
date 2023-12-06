@@ -8,8 +8,14 @@ from torch.autograd import Variable
 
 import torch.nn as nn
 import torch
+import sys
+import os
 
-from utils.CustomDataset import CustomDataset
+# 处理path
+current_file_path = os.path.abspath(__file__)
+current_directory = os.path.dirname(os.path.dirname(current_file_path))
+sys.path.insert(0, current_directory)
+from utils.CustomDataset import CDataset
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -135,7 +141,7 @@ transform = transforms.Compose(
     ]
 )
 
-dataset = CustomDataset(
+dataset = CDataset(
     image_dir=r"/root/lmy/GanZoo/dataset/B301MM/high", transform=transform
 )
 
