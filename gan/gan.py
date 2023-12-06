@@ -12,16 +12,39 @@ import torch
 from utils.CustomDataset import CustomDataset
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_epochs", type=int, default=2000, help="number of epochs of training")
+parser.add_argument(
+    "--n_epochs", type=int, default=2000, help="number of epochs of training"
+)
 parser.add_argument("--batch_size", type=int, default=128, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
-parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
-parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
-parser.add_argument("--img_size", type=int, default=256, help="size of each image dimension")
+parser.add_argument(
+    "--b1",
+    type=float,
+    default=0.5,
+    help="adam: decay of first order momentum of gradient",
+)
+parser.add_argument(
+    "--b2",
+    type=float,
+    default=0.999,
+    help="adam: decay of first order momentum of gradient",
+)
+parser.add_argument(
+    "--n_cpu",
+    type=int,
+    default=8,
+    help="number of cpu threads to use during batch generation",
+)
+parser.add_argument(
+    "--latent_dim", type=int, default=100, help="dimensionality of the latent space"
+)
+parser.add_argument(
+    "--img_size", type=int, default=256, help="size of each image dimension"
+)
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
-parser.add_argument("--sample_interval", type=int, default=400, help="interval betwen image samples")
+parser.add_argument(
+    "--sample_interval", type=int, default=400, help="interval betwen image samples"
+)
 opt = parser.parse_args()
 print(opt)
 
@@ -103,15 +126,18 @@ if cuda:
 # )
 
 
-transform = transforms.Compose([
-    # transforms.Grayscale(),  # 如果图像不是灰度图像，请添加此行
-    transforms.Resize((opt.img_size, opt.img_size)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.5], [0.5])
-])
+transform = transforms.Compose(
+    [
+        # transforms.Grayscale(),  # 如果图像不是灰度图像，请添加此行
+        transforms.Resize((opt.img_size, opt.img_size)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.5], [0.5]),
+    ]
+)
 
-dataset = CustomDataset(image_dir=r'C:\Users\Eon\PycharmProjects\GanZoo\dataset\celeba\high_gray',
-                        transform=transform)
+dataset = CustomDataset(
+    image_dir=r"/root/lmy/GanZoo/dataset/B301MM/high", transform=transform
+)
 
 dataloader = torch.utils.data.DataLoader(
     dataset,
@@ -120,8 +146,12 @@ dataloader = torch.utils.data.DataLoader(
 )
 
 # Optimizers
-optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
-optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
+optimizer_G = torch.optim.Adam(
+    generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
+)
+optimizer_D = torch.optim.Adam(
+    discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
+)
 
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
@@ -132,7 +162,6 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 def train(out_path="output"):
     for epoch in range(opt.n_epochs):
         for i, imgs in enumerate(dataloader):
-
             # Adversarial ground truths
             valid = Variable(Tensor(imgs.size(0), 1).fill_(1.0), requires_grad=False)
             fake = Variable(Tensor(imgs.size(0), 1).fill_(0.0), requires_grad=False)
@@ -147,7 +176,9 @@ def train(out_path="output"):
             optimizer_G.zero_grad()
 
             # Sample noise as generator input
-            z = Variable(Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim))))
+            z = Variable(
+                Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim)))
+            )
 
             # Generate a batch of images
             gen_imgs = generator(z)
@@ -174,13 +205,25 @@ def train(out_path="output"):
 
             print(
                 "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-                % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item())
+                % (
+                    epoch,
+                    opt.n_epochs,
+                    i,
+                    len(dataloader),
+                    d_loss.item(),
+                    g_loss.item(),
+                )
             )
 
             batches_done = epoch * len(dataloader) + i
             if batches_done % opt.sample_interval == 0:
-                save_image(gen_imgs.data[:25], out_path + "%d.png" % batches_done, nrow=5, normalize=True)
+                save_image(
+                    gen_imgs.data[:25],
+                    out_path + "%d.png" % batches_done,
+                    nrow=5,
+                    normalize=True,
+                )
 
 
-if __name__ == '__main__':
-    train(r"C:\\Users\\Eon\\PycharmProjects\\GanZoo\\gan\\output\\")
+if __name__ == "__main__":
+    train(r"/root/lmy/GanZoo/gan/output/")
