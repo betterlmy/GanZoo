@@ -15,7 +15,7 @@ import os
 current_file_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(os.path.dirname(current_file_path))
 sys.path.insert(0, current_directory)
-from utils.CustomDataset import CDataset
+from utils.CustomDataset import CustomDataset
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -51,12 +51,15 @@ parser.add_argument("--channels", type=int, default=1, help="number of image cha
 parser.add_argument(
     "--sample_interval", type=int, default=400, help="interval betwen image samples"
 )
+parser.add_argument("--device_id", type=str, default="1", help="cuda device id")
 opt = parser.parse_args()
 print(opt)
 
 img_shape = (opt.channels, opt.img_size, opt.img_size)
 
 cuda = True if torch.cuda.is_available() else False
+device = torch.device("cuda:" + opt.device_id if cuda else "cpu")
+print("current device:" + str(device))
 
 
 class Generator(nn.Module):
@@ -112,24 +115,10 @@ generator = Generator()
 discriminator = Discriminator()
 
 if cuda:
-    generator.cuda()
-    discriminator.cuda()
-    adversarial_loss.cuda()
-
-# # Configure data loader
-# os.makedirs("../../data/mnist", exist_ok=True)
-# dataloader = torch.utils.data.DataLoader(
-#     datasets.MNIST(
-#         "../../data/mnist",
-#         train=True,
-#         download=True,
-#         transform=transforms.Compose(
-#             [transforms.Resize(opt.img_size), transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]
-#         ),
-#     ),
-#     batch_size=opt.batch_size,
-#     shuffle=True,
-# )
+    device = torch.device("cuda:0")
+    generator.to(device)
+    discriminator.to(device)
+    adversarial_loss.to(device)
 
 
 transform = transforms.Compose(
@@ -141,7 +130,7 @@ transform = transforms.Compose(
     ]
 )
 
-dataset = CDataset(
+dataset = CustomDataset(
     image_dir=r"/root/lmy/GanZoo/dataset/B301MM/high", transform=transform
 )
 
