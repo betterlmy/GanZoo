@@ -13,9 +13,11 @@ import os
 
 # 处理path
 current_file_path = os.path.abspath(__file__)
-current_directory = os.path.dirname(os.path.dirname(current_file_path))
-sys.path.insert(0, current_directory)
-from utils.CustomDataset import CustomDataset
+parent_path = os.path.dirname(current_file_path)
+project_directory = os.path.dirname(parent_path)
+sys.path.insert(0, project_directory)
+from utils.CustomDataset import CDataset
+from utils.evaluation import ssim, psnr
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -110,7 +112,6 @@ class Discriminator(nn.Module):
 # Loss function
 adversarial_loss = torch.nn.BCELoss()
 
-# Initialize generator and discriminator
 generator = Generator()
 discriminator = Discriminator()
 
@@ -119,7 +120,6 @@ if cuda:
     generator.to(device)
     discriminator.to(device)
     adversarial_loss.to(device)
-
 
 transform = transforms.Compose(
     [
@@ -130,8 +130,9 @@ transform = transforms.Compose(
     ]
 )
 
-dataset = CustomDataset(
-    image_dir=r"/root/lmy/GanZoo/dataset/B301MM/high", transform=transform
+image_dir = os.path.join(project_directory, "dataset/B301MM/high")
+dataset = CDataset(
+    image_dir, transform
 )
 
 dataloader = torch.utils.data.DataLoader(
@@ -140,7 +141,6 @@ dataloader = torch.utils.data.DataLoader(
     shuffle=True,
 )
 
-# Optimizers
 optimizer_G = torch.optim.Adam(
     generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
 )
@@ -151,10 +151,8 @@ optimizer_D = torch.optim.Adam(
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
 
-# ----------
-#  Training
-# ----------
-def train(out_path="output"):
+def train():
+    out_path = os.path.join(parent_path, "output/")
     for epoch in range(opt.n_epochs):
         for i, imgs in enumerate(dataloader):
             # Adversarial ground truths
@@ -163,11 +161,6 @@ def train(out_path="output"):
 
             # Configure input
             real_imgs = Variable(imgs.type(Tensor))
-
-            # -----------------
-            #  Train Generator
-            # -----------------
-
             optimizer_G.zero_grad()
 
             # Sample noise as generator input
@@ -198,20 +191,18 @@ def train(out_path="output"):
             d_loss.backward()
             optimizer_D.step()
 
-            print(
-                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-                % (
-                    epoch,
-                    opt.n_epochs,
-                    i,
-                    len(dataloader),
-                    d_loss.item(),
-                    g_loss.item(),
-                )
-            )
-
             batches_done = epoch * len(dataloader) + i
             if batches_done % opt.sample_interval == 0:
+                print(
+                    "[Epoch %d/%d]  [D loss: %f] [G loss: %f]"
+                    % (
+                        epoch,
+                        opt.n_epochs,
+
+                        d_loss.item(),
+                        g_loss.item(),
+                    )
+                )
                 save_image(
                     gen_imgs.data[:25],
                     out_path + "%d.png" % batches_done,
@@ -219,6 +210,27 @@ def train(out_path="output"):
                     normalize=True,
                 )
 
+                # 计算SSIM和PSNR
+                dataset2 = CDataset(image_dir, transform)
+                psnr_value = 0
+                ssim_value = 0
+                for i in range(10):
+                    max_psnr = 0
+                    max_ssim = 0
+                    for j in range(100):
+                        real_imgs = dataset2[i]
+                        ssim_value = ssim(gen_imgs.data[i], real_imgs.to(device))
+                        psnr_value = psnr(gen_imgs.data[i], real_imgs.to(device))
+                        if psnr_value > max_psnr:
+                            max_psnr = psnr_value
+                        if ssim_value > max_ssim:
+                            max_ssim = ssim_value
+
+                    psnr_value += max_psnr
+                    ssim_value += max_ssim
+
+                print("SSIM: %f, PSNR: %f" % (ssim_value / 10, psnr_value / 10))
+
 
 if __name__ == "__main__":
-    train(r"/root/lmy/GanZoo/gan/output/")
+    train()
