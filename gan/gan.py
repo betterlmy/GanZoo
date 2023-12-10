@@ -1,66 +1,24 @@
-import argparse
 import numpy as np
 from torchvision.utils import save_image
 from torchvision import transforms
 from torch.utils.data import Dataset
-
 from torch.autograd import Variable
-
 import torch.nn as nn
 import torch
-import sys
 import os
 
-# 处理path
-current_file_path = os.path.abspath(__file__)
-parent_path = os.path.dirname(current_file_path)
-project_directory = os.path.dirname(parent_path)
-sys.path.insert(0, project_directory)
 from utils.CustomDataset import CDataset
-from utils.evaluation import ssim, psnr
+from utils import config
+from evalution import ssim, psnr, fid
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--n_epochs", type=int, default=2000, help="number of epochs of training"
-)
-parser.add_argument("--batch_size", type=int, default=128, help="size of the batches")
-parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
-parser.add_argument(
-    "--b1",
-    type=float,
-    default=0.5,
-    help="adam: decay of first order momentum of gradient",
-)
-parser.add_argument(
-    "--b2",
-    type=float,
-    default=0.999,
-    help="adam: decay of first order momentum of gradient",
-)
-parser.add_argument(
-    "--n_cpu",
-    type=int,
-    default=8,
-    help="number of cpu threads to use during batch generation",
-)
-parser.add_argument(
-    "--latent_dim", type=int, default=100, help="dimensionality of the latent space"
-)
-parser.add_argument(
-    "--img_size", type=int, default=256, help="size of each image dimension"
-)
-parser.add_argument("--channels", type=int, default=1, help="number of image channels")
-parser.add_argument(
-    "--sample_interval", type=int, default=400, help="interval betwen image samples"
-)
-parser.add_argument("--device_id", type=str, default="1", help="cuda device id")
-opt = parser.parse_args()
-print(opt)
-
-img_shape = (opt.channels, opt.img_size, opt.img_size)
+config_file = "config_default.yaml"
+configs = config.update_project_dir(config_file)
+model_config = configs['model']['gan']
+train_config = configs['train']
+img_shape = (model_config['channels'], model_config['img_size'], model_config['img_size'])
 
 cuda = True if torch.cuda.is_available() else False
-device = torch.device("cuda:" + opt.device_id if cuda else "cpu")
+device = torch.device("cuda:" + configs['train'].gpu_id if cuda else "cpu")
 print("current device:" + str(device))
 
 
@@ -76,7 +34,7 @@ class Generator(nn.Module):
             return layers
 
         self.model = nn.Sequential(
-            *block(opt.latent_dim, 128, normalize=False),
+            *block(model_config['latent_dim'], 128, normalize=False),
             *block(128, 256),
             *block(256, 512),
             *block(512, 1024),
@@ -124,36 +82,35 @@ if cuda:
 transform = transforms.Compose(
     [
         # transforms.Grayscale(),  # 如果图像不是灰度图像，请添加此行
-        transforms.Resize((opt.img_size, opt.img_size)),
+        transforms.Resize((model_config['img_size'], model_config['img_size'])),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5]),
     ]
 )
-
-image_dir = os.path.join(project_directory, "dataset/B301MM/high")
+image_dir = os.path.join(configs['project_dir'], configs['dataset_relative_path'])
 dataset = CDataset(
     image_dir, transform
 )
 
 dataloader = torch.utils.data.DataLoader(
     dataset,
-    batch_size=opt.batch_size,
+    batch_size=train_config['batch_size'],
     shuffle=True,
 )
 
 optimizer_G = torch.optim.Adam(
-    generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
+    generator.parameters(), lr=model_config['lr'], betas=(model_config['b1'], model_config['b2'])
 )
 optimizer_D = torch.optim.Adam(
-    discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
+    discriminator.parameters(), lr=model_config['lr'], betas=(model_config['b1'], model_config['b2'])
 )
 
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
 
 def train():
-    out_path = os.path.join(parent_path, "output/")
-    for epoch in range(opt.n_epochs):
+    out_path = os.path.join(configs['project_dir'], "gan/output/")
+    for epoch in range(train_config['n_epochs']):
         for i, imgs in enumerate(dataloader):
             # Adversarial ground truths
             valid = Variable(Tensor(imgs.size(0), 1).fill_(1.0), requires_grad=False)
@@ -165,7 +122,7 @@ def train():
 
             # Sample noise as generator input
             z = Variable(
-                Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim)))
+                Tensor(np.random.normal(0, 1, (imgs.shape[0], model_config['latent_dim'])))
             )
 
             # Generate a batch of images
@@ -192,12 +149,12 @@ def train():
             optimizer_D.step()
 
             batches_done = epoch * len(dataloader) + i
-            if batches_done % opt.sample_interval == 0:
+            if batches_done % train_config['sample_interval'] == 0:
                 print(
                     "[Epoch %d/%d]  [D loss: %f] [G loss: %f]"
                     % (
                         epoch,
-                        opt.n_epochs,
+                        train_config['n_epochs'],
 
                         d_loss.item(),
                         g_loss.item(),
