@@ -105,4 +105,4 @@ CT数据集训练效果如下
 通过添加onehot（也就是条件）给gan训练，实现控制gan的输出
 部分训练效果如下
 
-![4.png](cgan%2Foutput%2F4.png) ![9.png](cgan%2Foutput%2F9.png)
+![0.png](cgan%2Foutput%2F0.png) ![1.png](cgan%2Foutput%2F1.png)![5.png](cgan%2Foutput%2F5.png) ![6.png](cgan%2Foutput%2F6.png)![7.png](cgan%2Foutput%2F7.png) ![9.png](cgan%2Foutput%2F9.png)
