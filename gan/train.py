@@ -1,4 +1,3 @@
-import time
 from datetime import datetime
 
 import numpy as np
@@ -22,21 +21,21 @@ img_shape = (model_config['channels'], model_config['img_size'], model_config['i
 
 cuda = True if torch.cuda.is_available() else False
 device = torch.device("cuda:" + configs['train']['gpu_id'] if cuda else "cpu")
-print("current device:" + str(device))
 
 adversarial_loss = torch.nn.BCELoss()  # 二分类交叉熵损失函数
 
 generator = Generator(model_config['latent_dim'], img_shape)  # 生成器
 discriminator = Discriminator(img_shape)  # 判别器
-print("gan model initialized")
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
-
-wandb.init(project='test' + formatted_date, config=configs)
+use_wandb = configs['train']['use_wandb']
+if use_wandb:
+    wandb.init(project='gans', name='gan' + formatted_date, config=configs)
 
 if cuda:
     generator.to(device)
     discriminator.to(device)
     adversarial_loss.to(device)
+    print("current device:" + str(device))
 
 transform = transforms.Compose(
     [
@@ -110,22 +109,21 @@ def train():
                     nrow=4,
                     normalize=True,
                 )
-
-
-                wandb.log({
-                    "Epoch": epoch,
-                    "D loss": d_loss.item(),
-                    "G loss": g_loss.item(),
-                    "generated_images": [wandb.Image(img) for img in gen_imgs.data[:16]]
-                })
+                if use_wandb:
+                    wandb.log({
+                        "Epoch": epoch,
+                        "D loss": d_loss.item(),
+                        "G loss": g_loss.item(),
+                        "generated_images": [wandb.Image(img) for img in gen_imgs.data[:16]]
+                    })
 
             if batches_done % train_config['model_save_interval'] == 0:
-
                 # 保存模型
                 torch.save(generator.state_dict(), out_path + "gan_generator.pth")
                 torch.save(discriminator.state_dict(), out_path + "gan_discriminator.pth")
-                wandb.save(out_path + "gan_generator.pth")
-                wandb.save(out_path + "gan_discriminator.pth")
+                if use_wandb:
+                    wandb.save(out_path + "gan_generator.pth", base_path=out_path)
+                    wandb.save(out_path + "gan_discriminator.pth", base_path=out_path)
                 # 计算SSIM和PSNR
                 # dataset2 = CDataset(image_dir, transform)
                 # psnr_value = 0
@@ -149,4 +147,15 @@ def train():
 
 
 if __name__ == "__main__":
-    train()
+    try:
+        train()
+    except KeyboardInterrupt:
+        print("中断捕获，清理并关闭 wandb...")
+        if use_wandb:
+            wandb.finish()
+    except Exception as e:
+        print("发生错误:", e)
+        if use_wandb:
+            wandb.finish()
+    if use_wandb:
+        wandb.finish()

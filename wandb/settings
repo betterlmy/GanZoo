@@ -1,0 +1,5 @@
+[default]
+entity = betterlmy
+project = gans
+base_url = https://api.wandb.ai
+
