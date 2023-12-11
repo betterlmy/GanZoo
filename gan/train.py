@@ -1,3 +1,6 @@
+import time
+from datetime import datetime
+
 import numpy as np
 from torchvision.utils import save_image
 from torchvision import transforms
@@ -5,11 +8,11 @@ from torch.utils.data import Dataset
 from torch.autograd import Variable
 import torch
 import os
-
+import wandb
 from gan.model import Generator, Discriminator
 from utils.CustomDataset import CDataset
 from utils import config
-# from evalution import ssim, psnr, fid
+from evalution import ssim, psnr, fid
 
 config_file = "config_default.yaml"
 configs = config.update_project_dir(config_file)
@@ -23,8 +26,12 @@ print("current device:" + str(device))
 
 adversarial_loss = torch.nn.BCELoss()  # 二分类交叉熵损失函数
 
-generator = Generator(model_config['latent_dim'],img_shape)  # 生成器
+generator = Generator(model_config['latent_dim'], img_shape)  # 生成器
 discriminator = Discriminator(img_shape)  # 判别器
+print("gan model initialized")
+formatted_date = datetime.now().strftime("%m-%d-%H-%M")
+
+wandb.init(project='test' + formatted_date, config=configs)
 
 if cuda:
     generator.to(device)
@@ -93,22 +100,32 @@ def train():
                     % (
                         epoch,
                         train_config['n_epochs'],
-
                         d_loss.item(),
                         g_loss.item(),
                     )
                 )
-            if batches_done % train_config['sample_interval'] == 0:
                 save_image(
-                    gen_imgs.data[:25],
+                    gen_imgs.data[:16],
                     out_path + "%d.png" % batches_done,
-                    nrow=5,
+                    nrow=4,
                     normalize=True,
                 )
-                # 保存模型
-                torch.save(generator.state_dict(), out_path +"gan_generator.pth")
-                torch.save(discriminator.state_dict(), out_path +"gan_discriminator.pth")
 
+
+                wandb.log({
+                    "Epoch": epoch,
+                    "D loss": d_loss.item(),
+                    "G loss": g_loss.item(),
+                    "generated_images": [wandb.Image(img) for img in gen_imgs.data[:16]]
+                })
+
+            if batches_done % train_config['model_save_interval'] == 0:
+
+                # 保存模型
+                torch.save(generator.state_dict(), out_path + "gan_generator.pth")
+                torch.save(discriminator.state_dict(), out_path + "gan_discriminator.pth")
+                wandb.save(out_path + "gan_generator.pth")
+                wandb.save(out_path + "gan_discriminator.pth")
                 # 计算SSIM和PSNR
                 # dataset2 = CDataset(image_dir, transform)
                 # psnr_value = 0

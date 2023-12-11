@@ -9,10 +9,9 @@ model:
     lr: 0.0002
     n_cpu: 8
 project_dir: /root/lmy/GanZoo
-project_name: test
 train:
   batch_size: 256
   gpu_id: '6'
   n_epochs: 2000
   print_interval: 50
-  sample_interval: 400
+  model_save_interval: 400
