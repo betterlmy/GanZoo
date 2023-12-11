@@ -103,12 +103,7 @@ def train():
                         g_loss.item(),
                     )
                 )
-                save_image(
-                    gen_imgs.data[:16],
-                    out_path + "%d.png" % batches_done,
-                    nrow=4,
-                    normalize=True,
-                )
+
                 if use_wandb:
                     wandb.log({
                         "Epoch": epoch,
@@ -118,6 +113,12 @@ def train():
                     })
 
             if batches_done % train_config['model_save_interval'] == 0:
+                save_image(
+                    gen_imgs.data[:16],
+                    out_path + "%d.png" % batches_done,
+                    nrow=4,
+                    normalize=True,
+                )
                 # 保存模型
                 torch.save(generator.state_dict(), out_path + "gan_generator.pth")
                 torch.save(discriminator.state_dict(), out_path + "gan_discriminator.pth")
