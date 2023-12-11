@@ -9,7 +9,7 @@ import os
 from gan.model import Generator, Discriminator
 from utils.CustomDataset import CDataset
 from utils import config
-from evalution import ssim, psnr, fid
+# from evalution import ssim, psnr, fid
 
 config_file = "config_default.yaml"
 configs = config.update_project_dir(config_file)
@@ -18,7 +18,7 @@ train_config = configs['train']
 img_shape = (model_config['channels'], model_config['img_size'], model_config['img_size'])
 
 cuda = True if torch.cuda.is_available() else False
-device = torch.device("cuda:" + configs['train'].gpu_id if cuda else "cpu")
+device = torch.device("cuda:" + configs['train']['gpu_id'] if cuda else "cpu")
 print("current device:" + str(device))
 
 adversarial_loss = torch.nn.BCELoss()  # 二分类交叉熵损失函数
@@ -33,7 +33,7 @@ if cuda:
 
 transform = transforms.Compose(
     [
-        # transforms.Grayscale(),  # 如果图像不是灰度图像，请添加此行
+        # transforms.Grayscale(),  # 如果图像不是灰度图像，添加此行
         transforms.Resize((model_config['img_size'], model_config['img_size'])),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5]),
@@ -57,21 +57,21 @@ optimizer_D = torch.optim.Adam(
     discriminator.parameters(), lr=model_config['lr'], betas=(model_config['b1'], model_config['b2'])
 )
 
-Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
+Tensor = torch.FloatTensor
 
 
 def train():
     out_path = os.path.join(configs['project_dir'], "gan/output/")
     for epoch in range(train_config['n_epochs']):
         for i, imgs in enumerate(dataloader):
-            valid = Variable(Tensor(imgs.size(0), 1).fill_(1.0), requires_grad=False)
-            fake = Variable(Tensor(imgs.size(0), 1).fill_(0.0), requires_grad=False)
+            valid = Variable(Tensor(imgs.size(0), 1).fill_(1.0), requires_grad=False).to(device)
+            fake = Variable(Tensor(imgs.size(0), 1).fill_(0.0), requires_grad=False).to(device)
 
-            real_imgs = Variable(imgs.type(Tensor))
+            real_imgs = Variable(imgs.type(Tensor)).to(device)
             optimizer_G.zero_grad()
             z = Variable(
                 Tensor(np.random.normal(0, 1, (imgs.shape[0], model_config['latent_dim'])))
-            )
+            ).to(device)
             gen_imgs = generator(z)
 
             g_loss = adversarial_loss(discriminator(gen_imgs), valid)
@@ -87,7 +87,7 @@ def train():
             optimizer_D.step()
 
             batches_done = epoch * len(dataloader) + i
-            if batches_done % train_config['sample_interval'] == 0:
+            if batches_done % train_config['print_interval'] == 0:
                 print(
                     "[Epoch %d/%d]  [D loss: %f] [G loss: %f]"
                     % (
@@ -98,6 +98,7 @@ def train():
                         g_loss.item(),
                     )
                 )
+            if batches_done % train_config['sample_interval'] == 0:
                 save_image(
                     gen_imgs.data[:25],
                     out_path + "%d.png" % batches_done,
@@ -105,8 +106,8 @@ def train():
                     normalize=True,
                 )
                 # 保存模型
-                torch.save(generator.state_dict(), "gan_generator.pth")
-                torch.save(discriminator.state_dict(), "gan_discriminator.pth")
+                torch.save(generator.state_dict(), out_path +"gan_generator.pth")
+                torch.save(discriminator.state_dict(), out_path +"gan_discriminator.pth")
 
                 # 计算SSIM和PSNR
                 # dataset2 = CDataset(image_dir, transform)
