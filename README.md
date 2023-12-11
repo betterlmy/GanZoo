@@ -93,10 +93,16 @@ https://github.com/eriklindernoren/PyTorch-GAN
 5. **Pix2Pix**: 用于成对的图像到图像转换。
 6. **Wasserstein GAN DIV (WGAN-DIV)**: 一种WGAN的变体，使用散度项来改善训练。
 
-## 基础GAN模型 2014年
+## 基础GAN 2014年
 
 为了测试 先使用celebA数据集，部分训练效果如下
-![14800.png](gan%2Foutput1205celeba%2F14800.png)
+![14800.png](gan%2Foutput1205celeba%2F15600.png)
 
 CT数据集训练效果如下
 ![9600.png](gan%2Foutput1207ct%2F9600.png)
+
+## CGAN条件模型
+通过添加onehot（也就是条件）给gan训练，实现控制gan的输出
+部分训练效果如下
+
+![4.png](cgan%2Foutput%2F4.png) ![9.png](cgan%2Foutput%2F9.png)
