@@ -24,7 +24,7 @@ batch_size = 128
 num_epoch = 100
 z_dimension = 100
 
-# 图形啊处理过程
+# 图形处理过程
 img_transform = transforms.Compose([
     transforms.ToTensor(),
     # transforms.Lambda(lambda x: x.repeat(3,1,1)),
