@@ -2,6 +2,14 @@
 
 使用模型进行医学CT影像重建，达到对带有噪声的低剂量CT影像进行修复获得相对清晰的影像
 
+https://github.com/eriklindernoren/PyTorch-GAN这个仓库使用torch实现了许多GAN的模型
+1. **GAN**: 基本的生成对抗网络。
+2. **Conditional GAN (CGAN)**: 生成特定条件或类别的图像。
+3. **Deep Convolutional GAN (DCGAN)**: 使用深度卷积网络的GAN，用于生成高质量图像。
+4. **Enhanced Super-Resolution GAN (ESRGAN)**: 用于图像超分辨率。
+5. **Pix2Pix**: 用于成对的图像到图像转换。
+6. **Wasserstein GAN DIV (WGAN-DIV)**: 一种WGAN的变体，使用散度项来改善训练。
+
 # 实验步骤
 
 ## 数据处理
@@ -82,16 +90,6 @@ img_transformed = transform(img_rgb)
 
 ## GAN模型
 
-https://github.com/eriklindernoren/PyTorch-GAN
-
-这个仓库使用torch实现了许多GAN的模型
-
-1. **Conditional GAN (CGAN)**: 生成特定条件或类别的图像。
-2. **Deep Convolutional GAN (DCGAN)**: 使用深度卷积网络的GAN，用于生成高质量图像。
-3. **GAN**: 基本的生成对抗网络。
-4. **Enhanced Super-Resolution GAN (ESRGAN)**: 用于图像超分辨率。
-5. **Pix2Pix**: 用于成对的图像到图像转换。
-6. **Wasserstein GAN DIV (WGAN-DIV)**: 一种WGAN的变体，使用散度项来改善训练。
 
 ## 基础GAN 2014年
 
@@ -103,6 +101,6 @@ CT数据集训练效果如下
 
 ## CGAN条件模型
 通过添加onehot（也就是条件）给gan训练，实现控制gan的输出
-部分训练效果如下
+训练效果如下
 
-![0.png](cgan%2Foutput%2F0.png) ![1.png](cgan%2Foutput%2F1.png)![5.png](cgan%2Foutput%2F5.png) ![6.png](cgan%2Foutput%2F6.png)![7.png](cgan%2Foutput%2F7.png) ![9.png](cgan%2Foutput%2F9.png)
+![0.png](cgan%2Foutput%2F0.png) ![1.png](cgan%2Foutput%2F1.png)![2.png](cgan%2Foutput%2F2.png) ![3.png](cgan%2Foutput%2F3.png)![4.png](cgan%2Foutput%2F4.png) ![5.png](cgan%2Foutput%2F5.png) ![6.png](cgan%2Foutput%2F6.png)![7.png](cgan%2Foutput%2F7.png) ![8.png](cgan%2Foutput%2F8.png)![9.png](cgan%2Foutput%2F9.png)
