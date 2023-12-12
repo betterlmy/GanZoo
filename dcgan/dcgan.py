@@ -5,6 +5,7 @@ from torchvision import transforms
 from torchvision import datasets
 from torchvision.utils import save_image
 import os
+from dcgan.model import discriminator, generator
 
 # 创建文件夹
 if not os.path.exists('./img_DCGAN'):
@@ -41,64 +42,6 @@ dataloader = torch.utils.data.DataLoader(
     dataset=mnist, batch_size=batch_size, shuffle=True
 )
 
-
-# 定义判别器  #####Discriminator######使用多层网络来作为判别器
-class discriminator(nn.Module):
-    def __init__(self):
-        super(discriminator, self).__init__()
-        self.dis = nn.Sequential(
-            nn.Conv2d(1, 32, 3, stride=1, padding=1),
-            nn.LeakyReLU(0.2, True),
-            nn.MaxPool2d((2, 2)),
-
-            nn.Conv2d(32, 64, 3, stride=1, padding=1),
-            nn.LeakyReLU(0.2, True),
-            nn.MaxPool2d((2, 2)),
-        )
-        self.fc = nn.Sequential(
-            nn.Linear(7 * 7 * 64, 1024),
-            nn.LeakyReLU(0.2, True),
-            nn.Linear(1024, 1),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        x = self.dis(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
-
-
-####### 定义生成器 Generator #####
-class generator(nn.Module):
-    def __init__(self, input_size, num_feature):
-        super(generator, self).__init__()
-        self.fc = nn.Linear(input_size, num_feature)
-        self.br = nn.Sequential(
-            nn.BatchNorm2d(1),
-            nn.ReLU(True),
-        )
-        self.gen = nn.Sequential(
-            nn.Conv2d(1, 64, 3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(True),
-
-            nn.Conv2d(64, 32, 3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(True),
-
-            nn.Conv2d(32, 1, 3, stride=2, padding=1),
-            nn.Tanh(),
-        )
-
-    def forward(self, x):
-        x = self.fc(x)
-        x = x.view(x.shape[0], 1, 56, 56)
-        x = self.br(x)
-        x = self.gen(x)
-        return x
-
-
 # 创建对象
 D = discriminator()
 G = generator(100, 1 * 56 * 56)
@@ -115,7 +58,6 @@ criterion = nn.BCELoss()  # 是单目标二分类交叉熵函数
 d_optimizer = torch.optim.Adam(D.parameters(), lr=0.0003)
 g_optimizer = torch.optim.Adam(G.parameters(), lr=0.0003)
 
-###########################进入训练##判别器的判断过程#####################
 
 for epoch in range(num_epoch):  # 进行多个epoch的训练
     for i, (img, _) in enumerate(dataloader):
@@ -137,7 +79,7 @@ for epoch in range(num_epoch):  # 进行多个epoch的训练
             fake_img = G(z)  # 随机噪声放入生成网络中，生成一张假的图片
             fake_out = D(fake_img)  # 判别器判断假的图片
             d_loss_fake = criterion(fake_out, fake_label)  # 得到假的图片的loss
-            fake_scores = fake_out  # 得到假图片的判别值，对于判别器来说，假图片的损失越接近0越好
+            fake_scores = fake_out  # 得到假图片的判别值，对于判别器来说，假图片的评分越接近0越好
 
             # 损失函数和优化
             d_loss = d_loss_real + d_loss_fake  # 损失包括判真损失和判假损失
@@ -152,7 +94,6 @@ for epoch in range(num_epoch):  # 进行多个epoch的训练
         # 反向传播更新的参数是生成网络里面的参数，
         # 这样可以通过更新生成网络里面的参数，来训练网络，使得生成的图片让判别器以为是真的
         # 这样就达到了对抗的目的
-
         # 计算假的图片的损失
 
         z = torch.randn(num_img, z_dimension).to(device)  # 得到随机噪声
