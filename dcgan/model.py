@@ -8,7 +8,6 @@ class discriminator(nn.Module):
             nn.Conv2d(1, 32, 3, stride=1, padding=1),
             nn.LeakyReLU(0.1, True),
             nn.MaxPool2d((2, 2)),
-
             nn.Conv2d(32, 64, 3, stride=1, padding=1),
             nn.LeakyReLU(0.1, True),
             nn.MaxPool2d((2, 2)),
@@ -17,15 +16,14 @@ class discriminator(nn.Module):
             nn.Linear(7 * 7 * 64, 1024),
             nn.LeakyReLU(0.1, True),
             nn.Linear(1024, 1),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
     def forward(self, x):
-
         x = self.dis(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
-        return x
+        return x.squeeze(-1)
 
 
 class generator(nn.Module):
@@ -40,11 +38,9 @@ class generator(nn.Module):
             nn.Conv2d(1, 64, 3, stride=1, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(True),
-
             nn.Conv2d(64, 32, 3, stride=1, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(True),
-
             nn.Conv2d(32, 1, 3, stride=2, padding=1),
             nn.Tanh(),
         )

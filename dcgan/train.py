@@ -5,13 +5,12 @@ from torchvision import transforms
 from torchvision import datasets
 from torchvision.utils import save_image
 import os
-from dcgan.model import discriminator, generator
+from model import discriminator, generator
 
 # 创建文件夹
-if not os.path.exists('./img_DCGAN'):
-    os.mkdir('./img_DCGAN')
-# GPU
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+if not os.path.exists("./img_DCGAN"):
+    os.mkdir("./img_DCGAN")
+device = "cuda:5" if torch.cuda.is_available() else "cpu"
 
 
 def to_img(x):
@@ -26,15 +25,17 @@ num_epoch = 100
 z_dimension = 100
 
 # 图形处理过程
-img_transform = transforms.Compose([
-    transforms.ToTensor(),
-    # transforms.Lambda(lambda x: x.repeat(3,1,1)),
-    transforms.Normalize(mean=[0.5], std=[0.5])
-])
+img_transform = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        # transforms.Lambda(lambda x: x.repeat(3,1,1)),
+        transforms.Normalize(mean=[0.5], std=[0.5]),
+    ]
+)
 
 # mnist dataset mnist数据集下载
 mnist = datasets.MNIST(
-    root='./data/', train=True, transform=img_transform, download=True
+    root="./data/", train=True, transform=img_transform, download=True
 )
 
 # data loader 数据载入
@@ -61,7 +62,7 @@ g_optimizer = torch.optim.Adam(G.parameters(), lr=0.0003)
 
 for epoch in range(num_epoch):  # 进行多个epoch的训练
     for i, (img, _) in enumerate(dataloader):
-        for a in range(3):
+        for a in range(2):  # 训练三次判别器
             num_img = img.size(0)
             # view()函数作用把img变成[batch_size,channel_size,784]
             img = img.view(num_img, 1, 28, 28)  # 将图片展开为28*28=784
@@ -98,7 +99,7 @@ for epoch in range(num_epoch):  # 进行多个epoch的训练
 
         z = torch.randn(num_img, z_dimension).to(device)  # 得到随机噪声
         fake_img = G(z)  # 随机噪声输入到生成器中，得到一副假的图片
-        output = D(fake_img).squeeze(1)  # 经过判别器得到的结果
+        output = D(fake_img)  # 经过判别器得到的结果
         g_loss = criterion(output, real_label)  # 得到的假的图片与真实的图片的label的loss
 
         # bp and optimize
@@ -109,20 +110,26 @@ for epoch in range(num_epoch):  # 进行多个epoch的训练
         # 打印中间的损失
         # try:
         if (i + 1) % 100 == 0:
-            print('Epoch[{}/{}],d_loss:{:.6f},g_loss:{:.6f} '
-                  'D real: {:.6f},D fake: {:.6f}'.format(
-                epoch, num_epoch, d_loss.item(), g_loss.item(),
-                torch.mean(real_scores).item(), torch.mean(fake_scores).item()  # 打印的是真实图片的损失均值
-            ))
+            print(
+                "Epoch[{}/{}],d_loss:{:.6f},g_loss:{:.6f} "
+                "D real: {:.6f},D fake: {:.6f}".format(
+                    epoch,
+                    num_epoch,
+                    d_loss.item(),
+                    g_loss.item(),
+                    torch.mean(real_scores).item(),
+                    torch.mean(fake_scores).item(),  # 打印的是真实图片的损失均值
+                )
+            )
         # except BaseException as e:
         #     pass
 
         if epoch == 0:
             real_images = to_img(real_img.cpu().data)
-            save_image(real_images, './img_DCGAN/real_images.png')
+            save_image(real_images, "./img_DCGAN/real_images.png")
 
         fake_images = to_img(fake_img.cpu().data)
-        save_image(fake_images, './img_DCGAN/fake_images-{}.png'.format(epoch + 1))
+        save_image(fake_images, "./img_DCGAN/fake_images-{}.png".format(epoch + 1))
 # 保存模型
-torch.save(G.state_dict(), './generator_DCGAN.pth')
-torch.save(D.state_dict(), './discriminator_DCGAN.pth')
+torch.save(G.state_dict(), "./generator_DCGAN.pth")
+torch.save(D.state_dict(), "./discriminator_DCGAN.pth")
