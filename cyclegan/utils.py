@@ -11,6 +11,11 @@ from torchvision.utils import save_image
 
 
 class ReplayBuffer:
+    """
+    ReplayBuffer用于存储先前生成的图像。
+    在GANs的背景下，尤其是CycleGAN中，这种技术可以通过为鉴别器提供多样性示例来帮助稳定训练，防止其过度拟合最近生成图像类型。
+    缓冲区具有max_size表示容量，并且有一个push_and_pop方法来管理图像的存储和检索。
+    """
     def __init__(self, max_size=50):
         assert max_size > 0, "Empty buffer or trying to create a black hole. Be careful."
         self.max_size = max_size

@@ -8,12 +8,14 @@ import torchvision.transforms as transforms
 
 
 def to_rgb(image):
+    """Converts image to rgb if it is grayscale"""
     rgb_image = Image.new("RGB", image.size)
     rgb_image.paste(image)
     return rgb_image
 
 
 class ImageDataset(Dataset):
+    """cycle要求成对的数据集"""
     def __init__(self, root, transforms_=None, unaligned=False, mode="train"):
         self.transform = transforms.Compose(transforms_)
         self.unaligned = unaligned

@@ -43,7 +43,8 @@ opt = parser.parse_args()
 print(opt)
 
 # Create sample and checkpoint directories
-os.makedirs("images/%s" % opt.dataset_name, exist_ok=True)
+os.makedirs("images/%s" % opt.dataset_name,
+            exist_ok=True)  # exist_ok = True: 如果目录存在，什么都不做，如果不存在，则创建该目录
 os.makedirs("saved_models/%s" % opt.dataset_name, exist_ok=True)
 
 # Losses

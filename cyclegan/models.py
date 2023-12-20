@@ -1,9 +1,17 @@
+# 定义了使用残差块的生成器和鉴别器的CycleGAN模型。
+
 import torch.nn as nn
-import torch.nn.functional as F
 import torch
 
 
+
+
 def weights_init_normal(m):
+    """
+    该函数初始化神经网络的权重。
+    它使用正态分布设置卷积层(Conv)的权重，并将偏置初始化为零。
+    对于BatchNorm2d层，权重以1.0为中心进行正态分布初始化。这
+    """
     classname = m.__class__.__name__
     if classname.find("Conv") != -1:
         torch.nn.init.normal_(m.weight.data, 0.0, 0.02)
@@ -20,13 +28,17 @@ def weights_init_normal(m):
 
 
 class ResidualBlock(nn.Module):
+    """
+    残差块
+    残差块有助于解决深度学习模型训练过程中可能遇到的梯度消失和梯度爆炸问题
+    """
     def __init__(self, in_features):
         super(ResidualBlock, self).__init__()
 
         self.block = nn.Sequential(
-            nn.ReflectionPad2d(1),
+            nn.ReflectionPad2d(1), # 2D反射填充 填充大小1
             nn.Conv2d(in_features, in_features, 3),
-            nn.InstanceNorm2d(in_features),
+            nn.InstanceNorm2d(in_features), # 实例归一化，对每个样本单独归一化
             nn.ReLU(inplace=True),
             nn.ReflectionPad2d(1),
             nn.Conv2d(in_features, in_features, 3),
