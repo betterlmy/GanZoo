@@ -3,7 +3,6 @@ from datetime import datetime
 import numpy as np
 from torchvision.utils import save_image
 from torchvision import transforms
-from torch.utils.data import Dataset
 from torch.autograd import Variable
 import torch
 import os

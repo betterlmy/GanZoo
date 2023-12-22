@@ -4,12 +4,14 @@ import time
 import sys
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
-from models import *
-from datasets import *
+from models import GeneratorResNet, Discriminator, weights_init_normal
+from datasets import ImageDataset
 from utils import config
-from utils.CustomDataset import CDataset
 from utils.cyclegan_utils import ReplayBuffer, LambdaLR
 import torch
+import os
+from PIL import Image
+import torchvision.transforms as transforms
 
 config_file = "config_default.yaml"
 configs = config.update_project_dir(config_file)
@@ -91,28 +93,30 @@ fake_B_buffer = ReplayBuffer()
 # Image transformations
 transforms_ = [
     # 数据增强
-    transforms.Resize(int(model_config['img_size'] * 1.12), Image.BICUBIC),
+    transforms.Resize(int(model_config['img_size'] * 1.12), Image.Resampling.BICUBIC),
     transforms.RandomCrop((model_config['img_size'], model_config['img_size'])),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 ]
 
+train_data = ImageDataset("cyclegan/dogsvscats/dogs", "cyclegan/dogsvscats/cats", transforms_=transforms_,
+                          unaligned=True)
+val_data = ImageDataset("cyclegan/dogsvscats/dogs", "cyclegan/dogsvscats/cats", transforms_=transforms_,
+                        unaligned=True, mode="test")
+
 # Training data loader
 dataloader = DataLoader(
-    ImageDataset("cyclegan/dogsvscats/dogs", "cyclegan/dogsvscats/cats", transforms_=transforms_, unaligned=True),
-    batch_size=train_config['batch_size'],
+    train_data,
+    batch_size=model_config['batch_size'],
     shuffle=True,
-    num_workers=model_config['n_cpu'],
 )
 
 # Test data loader
 val_dataloader = DataLoader(
-    ImageDataset("cyclegan/dogsvscats/dogs", "cyclegan/dogsvscats/cats", transforms_=transforms_, unaligned=True,
-                 mode="test"),
+    val_data,
     batch_size=5,
     shuffle=True,
-    num_workers=model_config['n_cpu'],
 )
 
 
@@ -265,3 +269,6 @@ for epoch in range(model_config['epoch'], train_config['n_epochs']):
         torch.save(G_BA.state_dict(), "saved_models/%s/G_BA_%d.pth" % (model_config['dataset_name'], epoch))
         torch.save(D_A.state_dict(), "saved_models/%s/D_A_%d.pth" % (model_config['dataset_name'], epoch))
         torch.save(D_B.state_dict(), "saved_models/%s/D_B_%d.pth" % (model_config['dataset_name'], epoch))
+
+# if __name__ == '__main__':
+#     train_model()

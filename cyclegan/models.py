@@ -1,9 +1,6 @@
 # 定义了使用残差块的生成器和鉴别器的CycleGAN模型。
-
 import torch.nn as nn
 import torch
-
-
 
 
 def weights_init_normal(m):
@@ -32,13 +29,14 @@ class ResidualBlock(nn.Module):
     残差块
     残差块有助于解决深度学习模型训练过程中可能遇到的梯度消失和梯度爆炸问题
     """
+
     def __init__(self, in_features):
         super(ResidualBlock, self).__init__()
 
         self.block = nn.Sequential(
-            nn.ReflectionPad2d(1), # 2D反射填充 填充大小1 这有助于减少边界效应。
+            nn.ReflectionPad2d(1),  # 2D反射填充 填充大小1 这有助于减少边界效应。
             nn.Conv2d(in_features, in_features, 3),
-            nn.InstanceNorm2d(in_features), # 实例归一化，对每个样本单独归一化
+            nn.InstanceNorm2d(in_features),  # 实例归一化，对每个样本单独归一化
             nn.ReLU(inplace=True),
             nn.ReflectionPad2d(1),
             nn.Conv2d(in_features, in_features, 3),
@@ -111,7 +109,7 @@ class Discriminator(nn.Module):
         channels, height, width = input_shape
 
         # Calculate output shape of image discriminator (PatchGAN)
-        self.output_shape = (1, height // 2 ** 4, width // 2 ** 4) # 4是因为有4个下采样的卷积层  ** 优先级高于//
+        self.output_shape = (1, height // 2 ** 4, width // 2 ** 4)  # 4是因为有4个下采样的卷积层  ** 优先级高于//
 
         def discriminator_block(in_filters, out_filters, normalize=True):
             """Returns downsampling layers of each discriminator block"""
