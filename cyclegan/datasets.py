@@ -16,12 +16,13 @@ def to_rgb(image):
 
 class ImageDataset(Dataset):
     """cycle要求成对的数据集"""
-    def __init__(self, root, transforms_=None, unaligned=False, mode="train"):
+
+    def __init__(self, rootA, rootB, transforms_=None, unaligned=False, mode="train"):
         self.transform = transforms.Compose(transforms_)
         self.unaligned = unaligned
 
-        self.files_A = sorted(glob.glob(os.path.join(root, "%s/A" % mode) + "/*.*"))
-        self.files_B = sorted(glob.glob(os.path.join(root, "%s/B" % mode) + "/*.*"))
+        self.files_A = sorted(glob.glob(os.path.join(rootA, "%s" % mode) + "/*.jpg"))
+        self.files_B = sorted(glob.glob(os.path.join(rootB, "%s" % mode) + "/*.jpg"))
 
     def __getitem__(self, index):
         image_A = Image.open(self.files_A[index % len(self.files_A)])

@@ -1,21 +1,14 @@
-import argparse
-import numpy as np
 import itertools
 import datetime
 import time
 import sys
 from torchvision.utils import save_image, make_grid
-
 from torch.utils.data import DataLoader
-from torch.autograd import Variable
-
 from models import *
 from datasets import *
 from utils import config
 from utils.CustomDataset import CDataset
 from utils.cyclegan_utils import ReplayBuffer, LambdaLR
-import torch.nn as nn
-import torch.nn.functional as F
 import torch
 
 config_file = "config_default.yaml"
@@ -23,7 +16,7 @@ configs = config.update_project_dir(config_file)
 model_config = configs['model']['cyclegan']
 train_config = configs['train']
 
-os.makedirs("images/%s" % model_config['dataset_name'],
+os.makedirs("outputs/%s" % model_config['dataset_name'],
             exist_ok=True)  # exist_ok = True: 如果目录存在，什么都不做，如果不存在，则创建该目录
 os.makedirs("saved_models/%s" % model_config['dataset_name'], exist_ok=True)
 
@@ -33,7 +26,7 @@ criterion_cycle = torch.nn.L1Loss()
 criterion_identity = torch.nn.L1Loss()
 
 cuda = torch.cuda.is_available()
-
+device = torch.device("cuda:0" if cuda else "cpu")
 input_shape = (model_config['channels'], model_config['img_size'], model_config['img_size'])
 
 # Initialize generator and discriminator
@@ -73,8 +66,10 @@ optimizer_G = torch.optim.Adam(
     itertools.chain(G_AB.parameters(), G_BA.parameters()), lr=model_config['lr'],
     betas=(model_config['b1'], model_config['b2'])
 )
+# 两个生成器 G_AB 和 G_BA 的参数合并成一个参数迭代器。
+
 optimizer_D_A = torch.optim.Adam(D_A.parameters(), lr=model_config['lr'],
-                                 betas=(model_config['b1'], model_config['b2']))
+                                 betas=(model_config['b1'], model_config['b2']))  # betas用于计算梯度和梯度平方的运行平均值，
 optimizer_D_B = torch.optim.Adam(D_B.parameters(), lr=model_config['lr'],
                                  betas=(model_config['b1'], model_config['b2']))
 
@@ -89,14 +84,13 @@ lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(
     optimizer_D_B, lr_lambda=LambdaLR(train_config['n_epochs'], model_config['epoch'], model_config['decay_epoch']).step
 )
 
-Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
-
 # Buffers of previously generated samples
 fake_A_buffer = ReplayBuffer()
 fake_B_buffer = ReplayBuffer()
 
 # Image transformations
 transforms_ = [
+    # 数据增强
     transforms.Resize(int(model_config['img_size'] * 1.12), Image.BICUBIC),
     transforms.RandomCrop((model_config['img_size'], model_config['img_size'])),
     transforms.RandomHorizontalFlip(),
@@ -106,17 +100,19 @@ transforms_ = [
 
 # Training data loader
 dataloader = DataLoader(
-    ImageDataset("../../data/%s" % model_config['dataset_name'], transforms_=transforms_, unaligned=True),
+    ImageDataset("cyclegan/dogsvscats/dogs", "cyclegan/dogsvscats/cats", transforms_=transforms_, unaligned=True),
     batch_size=train_config['batch_size'],
     shuffle=True,
     num_workers=model_config['n_cpu'],
 )
+
 # Test data loader
 val_dataloader = DataLoader(
-    ImageDataset("../../data/%s" % model_config['dataset_name'], transforms_=transforms_, unaligned=True, mode="test"),
+    ImageDataset("cyclegan/dogsvscats/dogs", "cyclegan/dogsvscats/cats", transforms_=transforms_, unaligned=True,
+                 mode="test"),
     batch_size=5,
     shuffle=True,
-    num_workers=1,
+    num_workers=model_config['n_cpu'],
 )
 
 
@@ -125,9 +121,9 @@ def sample_images(batches_done):
     imgs = next(iter(val_dataloader))
     G_AB.eval()
     G_BA.eval()
-    real_A = Variable(imgs["A"].type(Tensor))
+    real_A = imgs["A"].to(device)
     fake_B = G_AB(real_A)
-    real_B = Variable(imgs["B"].type(Tensor))
+    real_B = imgs["B"].to(device)
     fake_A = G_BA(real_B)
     # Arange images along x-axis
     real_A = make_grid(real_A, nrow=5, normalize=True)
@@ -136,7 +132,7 @@ def sample_images(batches_done):
     fake_B = make_grid(fake_B, nrow=5, normalize=True)
     # Arange images along y-axis
     image_grid = torch.cat((real_A, fake_B, real_B, fake_A), 1)
-    save_image(image_grid, "images/%s/%s.png" % (model_config['dataset_name'], batches_done), normalize=False)
+    save_image(image_grid, "outputs/%s/%s.png" % (model_config['dataset_name'], batches_done), normalize=False)
 
 
 # ----------
@@ -146,14 +142,13 @@ def sample_images(batches_done):
 prev_time = time.time()
 for epoch in range(model_config['epoch'], train_config['n_epochs']):
     for i, batch in enumerate(dataloader):
-
         # Set model input
-        real_A = Variable(batch["A"].type(Tensor))
-        real_B = Variable(batch["B"].type(Tensor))
+        real_A = batch["A"].to(device)
+        real_B = batch["B"].to(device)
 
         # Adversarial ground truths
-        valid = Variable(Tensor(np.ones((real_A.size(0), *D_A.output_shape))), requires_grad=False)
-        fake = Variable(Tensor(np.zeros((real_A.size(0), *D_A.output_shape))), requires_grad=False)
+        valid = torch.ones((real_A.size(0), *D_A.output_shape), dtype=torch.float32, requires_grad=False).to(device)
+        fake = torch.zeros((real_A.size(0), *D_A.output_shape), dtype=torch.float32, requires_grad=False).to(device)
 
         # ------------------
         #  Train Generators
