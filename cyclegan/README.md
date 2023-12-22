@@ -45,39 +45,23 @@ CycleGAN(循环生成对抗网络)是一种特殊的GAN，用于解决无监督�
     * models.py   --- CycleGAN中使用的神经网络架构，包括生成器和判别器模型。
     * utils.py
 
+###  models.py
 
-$$
-\documentclass[border=8pt, multi, tikz]{standalone} 
-\usepackage{blocks}
+cyclegan模型实现的细节，包含了一个生成器类(GeneratorResNet)和判别器类(Discriminator)。以及一个残差块(ResidualBlock)和权重初始化的方法(weights_init_normal)
 
-\begin{document}
-\begin{tikzpicture}
-    \pic[shift={(0,0,0)}] at (0,0,0) {RightBandedBox={name=cr,%
-        caption=Convolution,%
-        xlabel={{3, }},
-        zlabel=256,
-        fill=\ConvColor,%
-        bandfill=\ConvReluColor,%
-        height=40,%
-        width={2},%
-        depth=40}};
-    \pic[shift={(0,0,0)}] at (2,0,0) {Box={name=p,%
-        fill=\PoolColor,%
-        opacity=0.5,%
-        height=32,%
-        width=1,%
-        depth=32}};
-    \draw [connection]  (cr-east)    -- node {\midarrow} (p-west);
+生成器包含了：
 
-    \pic[shift={(1,0,0)}] at (3,0,0) {RightBandedBox={name=cr2,%
-        caption=Convolution,%
-        xlabel={{64, }},
-        zlabel=128,
-        fill=\ConvColor,%
-        bandfill=\ConvReluColor,%
-        height=32,%
-        width={3.5},%
-        depth=32}};
-\end{tikzpicture}
-\end{document}
-$$
+1. 初始卷积块 (outchannels = 64)
+2. 两个下采样块 (outchannels \*=2  卷积stride = 2)
+3. n个残差块  (outchannels = outchannels)
+4. 两个上采样块  (outchannels //=2  卷积stride = 1 Upsample方式='nearest')
+5. 输出层
+
+判别器包含了4个鉴别器块
+
+CycleGAN 的鉴别器基于 PatchGAN 的概念设计。PatchGAN 通过对输入图像的不同区域（补丁）分别进行真假判断，而不是对整个图像作为一个整体进行判断。这有助于模型更加细致地区分图像的局部特征，使其能够更有效地区分真实图像和生成图像的局部差异。
+
+`self.output_shape` 在 CycleGAN 的鉴别器中表示输出的形状。这个形状是基于输入形状和网络的结构计算出来的。在这个特定的实现中，它是根据网络中的下采样步骤来计算的。
+
+### datasets.py
+

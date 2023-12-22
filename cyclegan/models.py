@@ -36,7 +36,7 @@ class ResidualBlock(nn.Module):
         super(ResidualBlock, self).__init__()
 
         self.block = nn.Sequential(
-            nn.ReflectionPad2d(1), # 2D反射填充 填充大小1
+            nn.ReflectionPad2d(1), # 2D反射填充 填充大小1 这有助于减少边界效应。
             nn.Conv2d(in_features, in_features, 3),
             nn.InstanceNorm2d(in_features), # 实例归一化，对每个样本单独归一化
             nn.ReLU(inplace=True),
@@ -46,6 +46,7 @@ class ResidualBlock(nn.Module):
         )
 
     def forward(self, x):
+        #  实现残差连接，即输入特征 x 与转换后的特征相加。这有助于在深层网络中保持梯度流动，防止梯度消失问题。
         return x + self.block(x)
 
 
@@ -54,7 +55,6 @@ class GeneratorResNet(nn.Module):
         super(GeneratorResNet, self).__init__()
 
         channels = input_shape[0]
-
         # Initial convolution block
         out_features = 64
         model = [
@@ -111,7 +111,7 @@ class Discriminator(nn.Module):
         channels, height, width = input_shape
 
         # Calculate output shape of image discriminator (PatchGAN)
-        self.output_shape = (1, height // 2 ** 4, width // 2 ** 4)
+        self.output_shape = (1, height // 2 ** 4, width // 2 ** 4) # 4是因为有4个下采样的卷积层  ** 优先级高于//
 
         def discriminator_block(in_filters, out_filters, normalize=True):
             """Returns downsampling layers of each discriminator block"""

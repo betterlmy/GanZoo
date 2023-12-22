@@ -8,7 +8,25 @@ model:
     latent_dim: 100
     lr: 0.0002
     n_cpu: 8
+
+  cyclegan:
+    b1: 0.5
+    b2: 0.999
+    channels: 3
+    img_size: 256
+    latent_dim: 100
+    lr: 0.0002
+    n_cpu: 8
+    dataset_name: monet2photo
+    batch_size: 1
+    decay_epoch: 100
+    sample_interval: 100
+    checkpoint_interval: -1
+    n_residual_blocks: 9
+    lambda_cyc: 10.0
+    lambda_id: 5.0
 project_dir: C:\Users\Eon\PycharmProjects\GanZoo
+
 train:
   batch_size: 256
   gpu_id: '0'
