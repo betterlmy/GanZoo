@@ -4,8 +4,8 @@ import time
 import sys
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
-from .models import GeneratorResNet, Discriminator, weights_init_normal
-from .datasets import ImageDataset
+from cyclegan.models import GeneratorResNet, Discriminator, weights_init_normal
+from cyclegan.datasets import ImageDataset
 from utils import config
 from utils.cyclegan_utils import ReplayBuffer, LambdaLR
 import torch
@@ -111,7 +111,7 @@ transforms_ = [
 train_data = ImageDataset("cyclegan/dogsvscats/dogs", "cyclegan/dogsvscats/cats", transforms_=transforms_,
                           unaligned=True)
 val_data = ImageDataset("cyclegan/dogsvscats/dogs", "cyclegan/dogsvscats/cats", transforms_=transforms_,
-                        unaligned=True, mode="test")
+                        unaligned=True, mode="train")
 
 # Training data loader
 dataloader = DataLoader(
@@ -168,6 +168,8 @@ for epoch in range(model_config['epoch'], train_config['n_epochs']):
 
         G_AB.train()
         G_BA.train()
+        D_A.eval()
+        D_B.eval()
 
         optimizer_G.zero_grad()
 
@@ -203,6 +205,10 @@ for epoch in range(model_config['epoch'], train_config['n_epochs']):
         #  Train Discriminator A
         # -----------------------
 
+        G_AB.eval()
+        G_BA.eval()
+        D_A.train()
+        D_B.eval()
         optimizer_D_A.zero_grad()
 
         # Real loss
@@ -219,7 +225,10 @@ for epoch in range(model_config['epoch'], train_config['n_epochs']):
         # -----------------------
         #  Train Discriminator B
         # -----------------------
-
+        G_AB.eval()
+        G_BA.eval()
+        D_A.eval()
+        D_B.train()
         optimizer_D_B.zero_grad()
 
         # Real loss

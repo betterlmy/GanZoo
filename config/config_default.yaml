@@ -8,10 +8,10 @@ model:
     checkpoint_interval: 100
     dataset_name: dogsvscats
     decay_epoch: 100
-    epoch: 800
+    epoch: 0
     img_size: 256
-    lambda_cyc: 10.0
-    lambda_id: 5.0
+    lambda_cyc: 3.0
+    lambda_id: 2.0
     latent_dim: 100
     lr: 0.0002
     n_cpu: 8
@@ -25,7 +25,7 @@ model:
     latent_dim: 100
     lr: 0.0002
     n_cpu: 8
-project_dir: /home/deng/dzn/l/GanZoo
+project_dir: C:\Users\Eon\PycharmProjects\GanZoo
 train:
   batch_size: 256
   gpu_id: '0'
