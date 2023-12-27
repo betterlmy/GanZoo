@@ -1,26 +1,32 @@
 import itertools
-import datetime
+from datetime import datetime ,timedelta
 import time
 import sys
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
-from models import GeneratorResNet, Discriminator, weights_init_normal
-from datasets import ImageDataset
+from .models import GeneratorResNet, Discriminator, weights_init_normal
+from .datasets import ImageDataset
 from utils import config
 from utils.cyclegan_utils import ReplayBuffer, LambdaLR
 import torch
 import os
 from PIL import Image
 import torchvision.transforms as transforms
+import wandb
 
 config_file = "config_default.yaml"
 configs = config.update_project_dir(config_file)
 model_config = configs['model']['cyclegan']
 train_config = configs['train']
+use_wandb = train_config['use_wandb']
+formatted_date = datetime.now().strftime("%m-%d-%H-%M")
 
-os.makedirs("outputs/%s" % model_config['dataset_name'],
+if use_wandb:
+    wandb.init(project='gans', name='cyclegan' + formatted_date, config=configs)
+
+os.makedirs("cyclegan/outputs/%s" % model_config['dataset_name'],
             exist_ok=True)  # exist_ok = True: 如果目录存在，什么都不做，如果不存在，则创建该目录
-os.makedirs("saved_models/%s" % model_config['dataset_name'], exist_ok=True)
+os.makedirs("cyclegan/saved_models/%s" % model_config['dataset_name'], exist_ok=True)
 
 # Losses
 criterion_GAN = torch.nn.MSELoss()
@@ -28,7 +34,7 @@ criterion_cycle = torch.nn.L1Loss()
 criterion_identity = torch.nn.L1Loss()
 
 cuda = torch.cuda.is_available()
-device = torch.device("cuda:0" if cuda else "cpu")
+device = torch.device("cuda:"+train_config['gpu_id'] if cuda else "cpu")
 input_shape = (model_config['channels'], model_config['img_size'], model_config['img_size'])
 
 # Initialize generator and discriminator
@@ -38,24 +44,26 @@ D_A = Discriminator(input_shape)
 D_B = Discriminator(input_shape)
 
 if cuda:
-    G_AB = G_AB.cuda()
-    G_BA = G_BA.cuda()
-    D_A = D_A.cuda()
-    D_B = D_B.cuda()
-    criterion_GAN.cuda()
-    criterion_cycle.cuda()
-    criterion_identity.cuda()
+    G_AB = G_AB.to(device)
+    G_BA = G_BA.to(device)
+    D_A = D_A.to(device)
+    D_B = D_B.to(device)
+    criterion_GAN.to(device)
+    criterion_cycle.to(device)
+    criterion_identity.to(device)
+    print("current device:" + str(device))
+
 
 if model_config['epoch'] != 0:
     # Load pretrained models
     G_AB.load_state_dict(
-        torch.load("saved_models/%s/G_AB_%d.pth" % (model_config['dataset_name'], model_config['epoch'])))
+        torch.load("cyclegan/saved_models/%s/G_AB_%d.pth" % (model_config['dataset_name'], model_config['epoch'])))
     G_BA.load_state_dict(
-        torch.load("saved_models/%s/G_BA_%d.pth" % (model_config['dataset_name'], model_config['epoch'])))
+        torch.load("cyclegan/saved_models/%s/G_BA_%d.pth" % (model_config['dataset_name'], model_config['epoch'])))
     D_A.load_state_dict(
-        torch.load("saved_models/%s/D_A_%d.pth" % (model_config['dataset_name'], model_config['epoch'])))
+        torch.load("cyclegan/saved_models/%s/D_A_%d.pth" % (model_config['dataset_name'], model_config['epoch'])))
     D_B.load_state_dict(
-        torch.load("saved_models/%s/D_B_%d.pth" % (model_config['dataset_name'], model_config['epoch'])))
+        torch.load("cyclegan/saved_models/%s/D_B_%d.pth" % (model_config['dataset_name'], model_config['epoch'])))
 else:
     # Initialize weights
     G_AB.apply(weights_init_normal)
@@ -136,8 +144,8 @@ def sample_images(batches_done):
     fake_B = make_grid(fake_B, nrow=5, normalize=True)
     # Arange images along y-axis
     image_grid = torch.cat((real_A, fake_B, real_B, fake_A), 1)
-    save_image(image_grid, "outputs/%s/%s.png" % (model_config['dataset_name'], batches_done), normalize=False)
-
+    save_image(image_grid, "cyclegan/outputs/%s/%s.png" % (model_config['dataset_name'], batches_done), normalize=False)
+    return image_grid
 
 # ----------
 #  Training
@@ -234,7 +242,7 @@ for epoch in range(model_config['epoch'], train_config['n_epochs']):
         # Determine approximate time left
         batches_done = epoch * len(dataloader) + i
         batches_left = train_config['n_epochs'] * len(dataloader) - batches_done
-        time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
+        time_left = timedelta(seconds=batches_left * (time.time() - prev_time)) # 计算剩余时间
         prev_time = time.time()
 
         # Print log
@@ -256,7 +264,18 @@ for epoch in range(model_config['epoch'], train_config['n_epochs']):
 
         # If at sample interval save image
         if batches_done % model_config['sample_interval'] == 0:
-            sample_images(batches_done)
+            outimages = sample_images(batches_done)
+
+            if use_wandb:
+                wandb.log({
+                    "Epoch": epoch,
+                    "D loss": loss_D.item(),
+                    "G loss": loss_G.item(),
+                    "GAN loss": loss_GAN.item(),
+                    "cycle loss": loss_cycle.item(),
+                    "Identity loss": loss_identity.item(),
+                    "generated_images": [wandb.Image(outimages)]
+                })
 
     # Update learning rates
     lr_scheduler_G.step()
@@ -265,10 +284,9 @@ for epoch in range(model_config['epoch'], train_config['n_epochs']):
 
     if model_config['checkpoint_interval'] != -1 and epoch % model_config['checkpoint_interval'] == 0:
         # Save model checkpoints
-        torch.save(G_AB.state_dict(), "saved_models/%s/G_AB_%d.pth" % (model_config['dataset_name'], epoch))
-        torch.save(G_BA.state_dict(), "saved_models/%s/G_BA_%d.pth" % (model_config['dataset_name'], epoch))
-        torch.save(D_A.state_dict(), "saved_models/%s/D_A_%d.pth" % (model_config['dataset_name'], epoch))
-        torch.save(D_B.state_dict(), "saved_models/%s/D_B_%d.pth" % (model_config['dataset_name'], epoch))
+        torch.save(G_AB.state_dict(), "cyclegan/saved_models/%s/G_AB_%d.pth" % (model_config['dataset_name'], epoch))
+        torch.save(G_BA.state_dict(), "cyclegan/saved_models/%s/G_BA_%d.pth" % (model_config['dataset_name'], epoch))
+        torch.save(D_A.state_dict(), "cyclegan/saved_models/%s/D_A_%d.pth" % (model_config['dataset_name'], epoch))
+        torch.save(D_B.state_dict(), "cyclegan/saved_models/%s/D_B_%d.pth" % (model_config['dataset_name'], epoch))
 
-# if __name__ == '__main__':
-#     train_model()
+

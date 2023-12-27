@@ -27,6 +27,7 @@ generator = Generator(model_config['latent_dim'], img_shape)  # 生成器
 discriminator = Discriminator(img_shape)  # 判别器
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
 use_wandb = configs['train']['use_wandb']
+
 if use_wandb:
     wandb.init(project='gans', name='gan' + formatted_date, config=configs)
 
