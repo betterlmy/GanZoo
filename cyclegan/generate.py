@@ -75,6 +75,7 @@ def sample_images(batches_done):
     save_image(fake_B, "cyclegan/outputs/%s/fake_B.png" % (model_config['dataset_name']), normalize=False)
 
     image_grid = torch.cat((real_A, fake_B, real_B, fake_A), 1)
+    ssim
     save_image(image_grid, "cyclegan/outputs/%s/%s.png" % (model_config['dataset_name'], batches_done), normalize=False)
     return image_grid
 

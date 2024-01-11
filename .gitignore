@@ -5,6 +5,10 @@ __pycache__/
 *.pth
 .wandb/
 data/
-.outpus
+.outputs
 wandb/
 wandb
+web/
+web
+results/
+.idea
