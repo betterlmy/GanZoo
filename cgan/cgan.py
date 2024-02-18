@@ -81,7 +81,7 @@ g_optimizer = torch.optim.Adam(G.parameters(), lr=0.0003)
 for epoch in range(num_epoch):  # 进行多个epoch的训练
     for i, (img, label) in enumerate(dataloader):
         num_img = img.size(0)
-        label_onehot = torch.zeros((num_img, 10)).to(device) # 10是class_num
+        label_onehot = torch.zeros((num_img, 10)).to(device)  # 10是class_num
         label_onehot[torch.arange(num_img), label] = 1
         # view()函数作用把img变成[batch_size,channel_size,784]
         img = img.view(num_img, -1)  # 将图片展开为28*28=784
@@ -132,4 +132,3 @@ for epoch in range(num_epoch):  # 进行多个epoch的训练
 # 保存模型
 torch.save(G.state_dict(), './generator_CGAN_z100.pth')
 torch.save(D.state_dict(), './discriminator_CGAN_z100.pth')
-
