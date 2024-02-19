@@ -16,7 +16,7 @@ transform = transforms.Compose([
 
 # 加载训练集和测试集
 train_set = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-train_loader = DataLoader(train_set, batch_size=256, shuffle=True)
+train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
 
 test_set = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
 test_loader = DataLoader(test_set, batch_size=64, shuffle=False)
@@ -33,7 +33,7 @@ class PatchEmbedding(nn.Module):
 
     def forward(self, x):
         x = self.proj(x)  # [B,E,H/P,W/P]
-        x = x.flateen(2)  # [B,E,N]
+        x = x.flatten(2)  # [B,E,N]
         x = x.transpose(1, 2)  # [B,N,E]
         return x
 
@@ -104,7 +104,8 @@ class TransformerBlock(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, value, key, query):
+    def forward(self, x):
+        value = key = query = x
         attention = self.attention(value, key, query)
 
         # Add skip connection, followed by LayerNorm
@@ -163,6 +164,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 for epoch in range(10):  # 遍历数据集多次
+    print(str(epoch+1))
     running_loss = 0.0
     for i, data in enumerate(train_loader, 0):
         inputs, labels = data[0].to(device), data[1].to(device)
