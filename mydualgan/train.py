@@ -117,6 +117,153 @@ test_dataloader = DataLoader(
 )
 
 
+# ----------
+#  Training
+# ----------
+
+def train():
+    prev_time = time.time()
+    for epoch in range(model_config['epoch'], train_config['n_epochs']):
+        for i, batch in enumerate(dataloader):    
+            trueSDCT = batch["TrueSDCT"].to(device) # 真实的SDCT
+            trueLDCT = batch["TrueLDCT"].to(device) # 真实的LDCT
+            fakeLDCT = batch["FakeLDCT"].to(device) # 加噪0.9SDCT得到的假LDCT
+            fakeULDCT = batch["FakeULDCT"].to(device) # 加噪0.8SDCT得到的假ULDCT
+            
+            # Adversarial ground truths
+            valid = torch.ones((trueLDCT.size(0), *patch), dtype=torch.float32, requires_grad=False).to(device)
+            fake = torch.zeros((trueLDCT.size(0), *patch), dtype=torch.float32, requires_grad=False).to(device)
+            
+            
+            # BGAN的训练使用到模拟的LDCT和真实的LDCT  学习模拟的LDCT到真实LDCT的映射关系 因此
+            b_generator.train()
+            b_discriminator.train()
+            db_generator.eval()
+            db_discriminator.eval()
+ 
+            optimizer_BG.zero_grad()
+            g_LDCT = b_generator(fakeLDCT)  
+            pred_fake1 = b_discriminator(g_LDCT, fakeLDCT)
+            loss_GAN1 = criterion_GAN(pred_fake1, valid)
+            
+            # Pixel-wise loss
+            loss_B_pixel = criterion_pixelwise(g_LDCT, trueLDCT)
+
+            # Total loss
+            loss_BG = loss_GAN1 + lambda_pixel * loss_B_pixel
+
+            loss_BG.backward()
+            optimizer_BG.step()
+            
+            optimizer_BD.zero_grad()
+            # Real loss
+            pred_real2 = b_discriminator(fakeLDCT, trueLDCT)
+            loss_real2 = criterion_GAN(pred_real2, valid)
+
+            # Fake loss
+            pred_fake2 = b_discriminator(g_LDCT.detach(), fakeLDCT)
+            loss_fake2 = criterion_GAN(pred_fake2, fake)
+
+            # Total loss
+            loss_BD = 0.5 * (loss_real2 + loss_fake2)
+
+            loss_BD.backward()
+            optimizer_BD.step()
+
+
+
+
+            # DBGAN的训练使用到了训练好的BGAN_G来生成模拟的ULDCT和真实的SDCT数据 之间的映射  学习模拟的ULDCT到真实SDCT的映射关系 因此 
+            b_generator.eval()
+            b_discriminator.eval()
+            db_generator.train()
+            db_discriminator.train()
+
+            optimizer_DBG.zero_grad()
+            ULDCT = b_generator(fakeULDCT) # 生成虚假的ULDCT 也就是模拟出来的ULDCT
+            g_SDCT = db_generator(ULDCT) # g_SDCT为去噪后的清晰CT
+            pred_fake3 = db_discriminator(g_SDCT, ULDCT) 
+            loss_GAN3 = criterion_GAN(pred_fake3, valid)
+            
+            # Pixel-wise loss
+            loss_DB_pixel = criterion_pixelwise(g_SDCT, trueSDCT)
+
+            # Total loss
+            loss_DBG = loss_GAN3 + lambda_pixel * loss_DB_pixel
+
+            loss_DBG.backward()
+            optimizer_DBG.step()
+            
+            # 训练DBGAN_D
+            optimizer_DBD.zero_grad()
+            # Real loss
+            pred_real4 = db_discriminator(trueSDCT, ULDCT)
+            loss_real4 = criterion_GAN(pred_real4, valid)
+
+            # Fake loss
+            pred_fake4 = db_discriminator(g_SDCT.detach(), ULDCT)
+            loss_fake4 = criterion_GAN(pred_fake4, fake)
+
+            # Total loss
+            loss_DBD = 0.5 * (loss_real4 + loss_fake4)
+
+            loss_DBD.backward()
+            optimizer_DBD.step()
+            
+
+
+            # --------------
+            #  Log Progress
+            # --------------
+
+            # Determine approximate time left
+            batches_done = epoch * len(dataloader) + i
+
+            batches_left = train_config['n_epochs'] * len(dataloader) - batches_done
+            time_left = timedelta(seconds=batches_left * (time.time() - prev_time))  # 计算剩余时间
+            prev_time = time.time()
+
+            # Print log
+            sys.stdout.write(
+                "\r[Epoch %d/%d] [Batch %d/%d] [BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
+                % (
+                    epoch,
+                    train_config['n_epochs'],
+                    i,
+                    len(dataloader),
+                    loss_BD.item(),
+                    loss_BG.item(),
+                    loss_B_pixel.item(),
+                    loss_DBD.item(),
+                    loss_DBG.item(),
+                    loss_DB_pixel.item(),
+                    time_left,
+                )
+            )
+
+            # # If at sample interval save image
+            # if batches_done % model_config['sample_interval'] == 0:
+            #     outimages, ssim_score, psnr_score = sample_images(batches_done)
+
+            #     if use_wandb:
+            #         wandb.log({
+            #             "Epoch": epoch,
+            #             "D loss": loss_D.item(),
+            #             "G loss": loss_G.item(),
+            #             "pixel loss": loss_pixel.item(),
+            #             "GAN loss": loss_GAN.item(),
+            #             "ssim_score": ssim_score,
+            #             "psnr_score": psnr_score,
+            #             "generated_images": [wandb.Image(outimages)]
+            #         })
+
+        if model_config['checkpoint_interval'] != -1 and epoch % model_config['checkpoint_interval'] == 0:
+            # Save model checkpoints
+            torch.save(db_generator.state_dict(),
+                       "mydualgan/saved_models/%s/db_generator_%d.pth" % (model_config['dataset_name'], epoch))
+            torch.save(db_discriminator.state_dict(),
+                       "mydualgan/saved_models/%s/db_discriminator_%d.pth" % (model_config['dataset_name'], epoch))
+
 
 ## 待修改
 def sample_images(batches_done):
@@ -137,117 +284,6 @@ def sample_images(batches_done):
     ssim_score = ssim.ssim(fake_A, real_A)
     psnr_score = psnr.psnr(fake_A, real_A)
     return train_image_grid, ssim_score, psnr_score
-
-
-# ----------
-#  Training
-# ----------
-
-def train():
-    prev_time = time.time()
-    for epoch in range(model_config['epoch'], train_config['n_epochs']):
-        for i, batch in enumerate(dataloader):
- 
-            # Model inputs
-            real_A = batch["B"].to(device) # 真实的LDCT
-            real_B = batch["A"].to(device) # 真实的SDCT
-
-            # Adversarial ground truths
-            valid = torch.ones((real_A.size(0), *patch), dtype=torch.float32, requires_grad=False).to(device)
-            fake = torch.zeros((real_A.size(0), *patch), dtype=torch.float32, requires_grad=False).to(device)
-
-            # ------------------
-            #  Train Generators
-            # ------------------
-
-            optimizer_DBG.zero_grad()
-
-            # GAN loss
-            fake_B = db_generator(real_A)  # 
-            pred_fake = db_discriminator(fake_B, real_A)
-            # print(pred_fake.shape)
-            loss_GAN = criterion_GAN(pred_fake, valid)
-            
-            # Pixel-wise loss
-            loss_pixel = criterion_pixelwise(fake_B, real_B)
-
-            # Total loss
-            loss_G = loss_GAN + lambda_pixel * loss_pixel
-
-            loss_G.backward()
-
-            optimizer_DBDBG.step()
-
-            # ---------------------
-            #  Train Discriminator
-            # ---------------------
-
-            optimizer_DBD.zero_grad()
-
-            # Real loss
-            pred_real = db_discriminator(real_B, real_A)
-            loss_real = criterion_GAN(pred_real, valid)
-
-            # Fake loss
-            pred_fake = db_discriminator(fake_B.detach(), real_A)
-            loss_fake = criterion_GAN(pred_fake, fake)
-
-            # Total loss
-            loss_D = 0.5 * (loss_real + loss_fake)
-
-            loss_D.backward()
-            optimizer_DBD.step()
-
-            # --------------
-            #  Log Progress
-            # --------------
-
-            # Determine approximate time left
-            batches_done = epoch * len(dataloader) + i
-
-            batches_left = train_config['n_epochs'] * len(dataloader) - batches_done
-            time_left = timedelta(seconds=batches_left * (time.time() - prev_time))  # 计算剩余时间
-            prev_time = time.time()
-
-            # Print log
-            sys.stdout.write(
-                "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, pixel: %f, adv: %f] ETA: %s"
-                % (
-                    epoch,
-                    train_config['n_epochs'],
-                    i,
-                    len(dataloader),
-                    loss_D.item(),
-                    loss_G.item(),
-                    loss_pixel.item(),
-                    loss_GAN.item(),
-                    time_left,
-                )
-            )
-
-            # If at sample interval save image
-            if batches_done % model_config['sample_interval'] == 0:
-                outimages, ssim_score, psnr_score = sample_images(batches_done)
-
-                if use_wandb:
-                    wandb.log({
-                        "Epoch": epoch,
-                        "D loss": loss_D.item(),
-                        "G loss": loss_G.item(),
-                        "pixel loss": loss_pixel.item(),
-                        "GAN loss": loss_GAN.item(),
-                        "ssim_score": ssim_score,
-                        "psnr_score": psnr_score,
-                        "generated_images": [wandb.Image(outimages)]
-                    })
-
-        if model_config['checkpoint_interval'] != -1 and epoch % model_config['checkpoint_interval'] == 0:
-            # Save model checkpoints
-            torch.save(db_generator.state_dict(),
-                       "mydualgan/saved_models/%s/db_generator_%d.pth" % (model_config['dataset_name'], epoch))
-            torch.save(db_discriminator.state_dict(),
-                       "mydualgan/saved_models/%s/db_discriminator_%d.pth" % (model_config['dataset_name'], epoch))
-
 
 if __name__ == '__main__':
     train()

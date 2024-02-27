@@ -1,7 +1,8 @@
 import glob
 import random
 import os
-
+import numpy as np
+import torch
 from torch.utils.data import Dataset
 from PIL import Image
 import torchvision.transforms as transforms
@@ -12,6 +13,20 @@ def to_rgb(image):
     rgb_image = Image.new("RGB", image.size)
     rgb_image.paste(image)
     return rgb_image
+
+def add_poisson_noise(image, scale=1.0):
+    """
+    Apply Poisson noise to the input image.
+    :param image: input image
+    :param scale: scale factor for the input image
+    :return: noisy image
+    """
+    # Scale the input image
+    image = (image+1)/2 # 归一化到[0,1]
+    scaled_image = image * scale 
+    noisy_image = torch.poisson(scaled_image)
+
+    return noisy_image*2-1 # 反归一化到(-1,1)
 
 
 class ImageDataset(Dataset):
@@ -42,9 +57,18 @@ class ImageDataset(Dataset):
             image_B = to_rgb(image_B)
         else:
             image_B = image_B.convert("L")
-        item_A = self.transform(image_A)
-        item_B = self.transform(image_B)
-        return {"A": item_A, "B": item_B}
+
+        TrueSDCT = self.transform(image_A)
+        TrueLDCT = self.transform(image_B)
+        FakeLDCT = add_poisson_noise(TrueSDCT,0.9)
+        FakeULDCT = add_poisson_noise(TrueSDCT,0.6)
+
+        return {
+            "TrueSDCT": TrueSDCT, 
+            "TrueLDCT": TrueLDCT,
+            "FakeLDCT": FakeLDCT, 
+            "FakeULDCT": FakeULDCT,           
+        }
 
     def __len__(self):
         return max(len(self.files_A), len(self.files_B))
