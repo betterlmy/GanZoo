@@ -142,7 +142,7 @@ def train():
             db_discriminator.eval()
  
             optimizer_BG.zero_grad()
-            g_LDCT = b_generator(fakeLDCT)  
+            g_LDCT = b_generator(fakeLDCT)  # 给出加噪得到的LDCT图像 用来模拟真实的LDCT
             pred_fake1 = b_discriminator(g_LDCT, fakeLDCT)
             loss_GAN1 = criterion_GAN(pred_fake1, valid)
             
@@ -155,6 +155,7 @@ def train():
             loss_BG.backward()
             optimizer_BG.step()
             
+            # 训练BGAN_D
             optimizer_BD.zero_grad()
             # Real loss
             pred_real2 = b_discriminator(fakeLDCT, trueLDCT)
@@ -179,8 +180,9 @@ def train():
             db_generator.train()
             db_discriminator.train()
 
-            optimizer_DBG.zero_grad()
             ULDCT = b_generator(fakeULDCT) # 生成虚假的ULDCT 也就是模拟出来的ULDCT
+            
+            optimizer_DBG.zero_grad()
             g_SDCT = db_generator(ULDCT) # g_SDCT为去噪后的清晰CT
             pred_fake3 = db_discriminator(g_SDCT, ULDCT) 
             loss_GAN3 = criterion_GAN(pred_fake3, valid)
@@ -197,12 +199,14 @@ def train():
             # 训练DBGAN_D
             optimizer_DBD.zero_grad()
             # Real loss
-            pred_real4 = db_discriminator(trueSDCT, ULDCT)
+            pred_real4 = db_discriminator(ULDCT, trueSDCT)
             loss_real4 = criterion_GAN(pred_real4, valid)
+            # loss_real4.retain_graph=True
 
             # Fake loss
             pred_fake4 = db_discriminator(g_SDCT.detach(), ULDCT)
             loss_fake4 = criterion_GAN(pred_fake4, fake)
+            # loss_fake4.retain_graph=True
 
             # Total loss
             loss_DBD = 0.5 * (loss_real4 + loss_fake4)

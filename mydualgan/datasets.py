@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import Dataset
 from PIL import Image
 import torchvision.transforms as transforms
+from torchvision.utils import save_image
 
 
 def to_rgb(image):
@@ -21,10 +22,11 @@ def add_poisson_noise(image, scale=1.0):
     :param scale: scale factor for the input image
     :return: noisy image
     """
-    # Scale the input image
     image = (image+1)/2 # 归一化到[0,1]
+
     scaled_image = image * scale 
-    noisy_image = torch.poisson(scaled_image)
+    noisy_image = torch.poisson(scaled_image)/scale
+    save_image(noisy_image, 'noisy_image.png')
 
     return noisy_image*2-1 # 反归一化到(-1,1)
 
@@ -60,8 +62,10 @@ class ImageDataset(Dataset):
 
         TrueSDCT = self.transform(image_A)
         TrueLDCT = self.transform(image_B)
-        FakeLDCT = add_poisson_noise(TrueSDCT,0.9)
-        FakeULDCT = add_poisson_noise(TrueSDCT,0.6)
+        save_image(TrueSDCT, 'image1.png')
+
+        FakeLDCT = add_poisson_noise(TrueSDCT,80)
+        FakeULDCT = add_poisson_noise(TrueSDCT,10)
 
         return {
             "TrueSDCT": TrueSDCT, 
