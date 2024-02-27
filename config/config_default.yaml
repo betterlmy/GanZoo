@@ -42,11 +42,28 @@ model:
     n_cpu: 8
     n_residual_blocks: 9
     sample_interval: 100
-project_dir: C:\Users\Eon\PycharmProjects\GanZoo
+  mydualgan:
+    b1: 0.5
+    b2: 0.999
+    batch_size: 32
+    channels: 1
+    checkpoint_interval: 100
+    dataset_name: B301MM
+    decay_epoch: 100
+    epoch: 0
+    img_size: 256
+    lambda_cyc: 3.0
+    lambda_id: 2.0
+    latent_dim: 100
+    lr: 0.0002
+    n_cpu: 8
+    n_residual_blocks: 9
+    sample_interval: 100
+project_dir: /home/deng/dzn/l/GanZoo
 train:
   batch_size: 256
   gpu_id: '0'
   model_save_interval: 400
   n_epochs: 2000
   print_interval: 50
-  use_wandb: true
+  use_wandb: false

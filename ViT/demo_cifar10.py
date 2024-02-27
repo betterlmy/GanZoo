@@ -6,8 +6,8 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
 # 检查是否有可用的GPU
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+print("device:",device)
 transform = transforms.Compose([
     transforms.Resize((224, 224)),  # 将图像大小调整为224x224以适应ViT输入
     transforms.ToTensor(),
@@ -158,7 +158,6 @@ class ViT(nn.Module):
         return x
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ViT().to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
