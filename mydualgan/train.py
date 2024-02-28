@@ -4,7 +4,7 @@ import time
 import sys
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
 from mydualgan.datasets import ImageDataset
@@ -21,17 +21,16 @@ import wandb
 
 config_file = "config_default.yaml"
 configs = config.update_project_dir(config_file)
-model_config = configs['model']['mydualgan']
-train_config = configs['train']
-use_wandb = train_config['use_wandb']
+model_config = configs["model"]["mydualgan"]
+train_config = configs["train"]
+use_wandb = train_config["use_wandb"]
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
 
 if use_wandb:
-    wandb.init(project='gans', name='mydualgan' + formatted_date, config=configs)
+    wandb.init(project="gans", name="mydualgan" + formatted_date, config=configs)
 
-os.makedirs("mydualgan/outputs/%s" % model_config['dataset_name'],
-            exist_ok=True)
-os.makedirs("mydualgan/saved_models/%s" % model_config['dataset_name'], exist_ok=True)
+os.makedirs("mydualgan/outputs/%s" % model_config["dataset_name"], exist_ok=True)
+os.makedirs("mydualgan/saved_models/%s" % model_config["dataset_name"], exist_ok=True)
 
 # Losses
 criterion_GAN = torch.nn.MSELoss()
@@ -41,16 +40,16 @@ criterion_pixelwise = torch.nn.L1Loss()
 lambda_pixel = 100
 
 # Calculate output of image discriminator (PatchGAN)
-patch = (1, model_config['img_size'] // 2 ** 4, model_config['img_size'] // 2 ** 4)
+patch = (1, model_config["img_size"] // 2**4, model_config["img_size"] // 2**4)
 
-db_generator = GeneratorUNet(model_config['channels'], model_config['channels'])
-db_discriminator = Discriminator(model_config['channels'])
+db_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
+db_discriminator = Discriminator(model_config["channels"])
 
-b_generator = GeneratorUNet(model_config['channels'], model_config['channels'])
-b_discriminator = Discriminator(model_config['channels'])
+b_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
+b_discriminator = Discriminator(model_config["channels"])
 
 cuda = torch.cuda.is_available()
-device = torch.device("cuda:" + train_config['gpu_id'] if cuda else "cpu")
+device = torch.device("cuda:" + train_config["gpu_id"] if cuda else "cpu")
 
 if cuda:
     db_generator = db_generator.to(device)
@@ -62,16 +61,32 @@ if cuda:
     criterion_pixelwise.to(device)
     print("current device:" + str(device))
 
-if model_config['epoch'] != 0:
+if model_config["epoch"] != 0:
     # Load pretrained models
     db_generator.load_state_dict(
-        torch.load("saved_models/%s/db_generator_%d.pth" % (train_config['dataset_name'], train_config['epoch'])))
+        torch.load(
+            "saved_models/%s/db_generator_%d.pth"
+            % (train_config["dataset_name"], train_config["epoch"])
+        )
+    )
     db_discriminator.load_state_dict(
-        torch.load("saved_models/%s/db_discriminator_%d.pth" % (train_config['dataset_name'], train_config['epoch'])))
+        torch.load(
+            "saved_models/%s/db_discriminator_%d.pth"
+            % (train_config["dataset_name"], train_config["epoch"])
+        )
+    )
     b_generator.load_state_dict(
-        torch.load("saved_models/%s/b_generator_%d.pth" % (train_config['dataset_name'], train_config['epoch'])))
+        torch.load(
+            "saved_models/%s/b_generator_%d.pth"
+            % (train_config["dataset_name"], train_config["epoch"])
+        )
+    )
     b_discriminator.load_state_dict(
-        torch.load("saved_models/%s/b_discriminator_%d.pth" % (train_config['dataset_name'], train_config['epoch'])))
+        torch.load(
+            "saved_models/%s/b_discriminator_%d.pth"
+            % (train_config["dataset_name"], train_config["epoch"])
+        )
+    )
 
 else:
     # Initialize weights
@@ -81,38 +96,58 @@ else:
     b_discriminator.apply(weights_init_normal)
 
 # Optimizers
-optimizer_DBG = torch.optim.Adam(db_generator.parameters(), lr=model_config['lr'],
-                                 betas=(model_config['b1'], model_config['b2']))
-optimizer_DBD = torch.optim.Adam(db_discriminator.parameters(), lr=model_config['lr'],
-                                 betas=(model_config['b1'], model_config['b2']))
-optimizer_BG = torch.optim.Adam(b_generator.parameters(), lr=model_config['lr'],
-                                betas=(model_config['b1'], model_config['b2']))
-optimizer_BD = torch.optim.Adam(b_discriminator.parameters(), lr=model_config['lr'],
-                                betas=(model_config['b1'], model_config['b2']))
+optimizer_DBG = torch.optim.Adam(
+    db_generator.parameters(),
+    lr=model_config["lr"],
+    betas=(model_config["b1"], model_config["b2"]),
+)
+optimizer_DBD = torch.optim.Adam(
+    db_discriminator.parameters(),
+    lr=model_config["lr"],
+    betas=(model_config["b1"], model_config["b2"]),
+)
+optimizer_BG = torch.optim.Adam(
+    b_generator.parameters(),
+    lr=model_config["lr"],
+    betas=(model_config["b1"], model_config["b2"]),
+)
+optimizer_BD = torch.optim.Adam(
+    b_discriminator.parameters(),
+    lr=model_config["lr"],
+    betas=(model_config["b1"], model_config["b2"]),
+)
 
 transforms_ = [
-    transforms.Resize((model_config['img_size'], model_config['img_size']), Image.BICUBIC),
+    transforms.Resize(
+        (model_config["img_size"], model_config["img_size"]), Image.BICUBIC
+    ),
     transforms.ToTensor(),
     transforms.Normalize((0.5,), (0.5,)),  # 单通道
 ]
 
 dataloader = DataLoader(
-    ImageDataset(os.path.join(configs['project_dir'], 'dataset', model_config['dataset_name']),
-                 transforms_=transforms_),
-    batch_size=model_config['batch_size'],
+    ImageDataset(
+        os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
+        transforms_=transforms_,
+    ),
+    batch_size=model_config["batch_size"],
     shuffle=True,
 )
 
 val_dataloader = DataLoader(
-    ImageDataset(os.path.join(configs['project_dir'], 'dataset', model_config['dataset_name']),
-                 transforms_=transforms_),
+    ImageDataset(
+        os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
+        transforms_=transforms_,
+    ),
     batch_size=5,
     shuffle=False,
 )
 
 test_dataloader = DataLoader(
-    ImageDataset(os.path.join(configs['project_dir'], 'dataset', model_config['dataset_name']),
-                 transforms_=transforms_),
+    ImageDataset(
+        os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
+        transforms_=transforms_,
+    ),
     batch_size=5,
     shuffle=False,
 )
@@ -122,9 +157,10 @@ test_dataloader = DataLoader(
 #  Training
 # ----------
 
+
 def train():
     prev_time = time.time()
-    for epoch in range(model_config['epoch'], train_config['n_epochs']):
+    for epoch in range(model_config["epoch"], train_config["n_epochs"]):
         for i, batch in enumerate(dataloader):
             trueSDCT = batch["TrueSDCT"].to(device)  # 真实的SDCT
             trueLDCT = batch["TrueLDCT"].to(device)  # 真实的LDCT
@@ -132,8 +168,12 @@ def train():
             fakeULDCT = batch["FakeULDCT"].to(device)  # 加噪0.8SDCT得到的假ULDCT
 
             # Adversarial ground truths
-            valid = torch.ones((trueLDCT.size(0), *patch), dtype=torch.float32, requires_grad=False).to(device)
-            fake = torch.zeros((trueLDCT.size(0), *patch), dtype=torch.float32, requires_grad=False).to(device)
+            valid = torch.ones(
+                (trueLDCT.size(0), *patch), dtype=torch.float32, requires_grad=False
+            ).to(device)
+            fake = torch.zeros(
+                (trueLDCT.size(0), *patch), dtype=torch.float32, requires_grad=False
+            ).to(device)
 
             # BGAN的训练使用到模拟的LDCT和真实的LDCT  学习模拟的LDCT到真实LDCT的映射关系 因此
             b_generator.train()
@@ -180,7 +220,9 @@ def train():
             db_generator.train()
             db_discriminator.eval()
 
-            ULDCT = b_generator(fakeULDCT).detach()  # 生成虚假的ULDCT 也就是模拟出来的ULDCT
+            ULDCT = b_generator(
+                fakeULDCT
+            ).detach()  # 生成虚假的ULDCT 也就是模拟出来的ULDCT
 
             optimizer_DBG.zero_grad()
             g_SDCT = db_generator(ULDCT)  # g_SDCT为去噪后的清晰CT
@@ -225,15 +267,17 @@ def train():
             # Determine approximate time left
             batches_done = epoch * len(dataloader) + i
 
-            batches_left = train_config['n_epochs'] * len(dataloader) - batches_done
-            time_left = timedelta(seconds=batches_left * (time.time() - prev_time))  # 计算剩余时间
+            batches_left = train_config["n_epochs"] * len(dataloader) - batches_done
+            time_left = timedelta(
+                seconds=batches_left * (time.time() - prev_time)
+            )  # 计算剩余时间
             prev_time = time.time()
             # Print log
             sys.stdout.write(
-                "\r[Epoch %d/%d] [Batch %d/%d] [PSNR:%f][SSIM:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
+                "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
                 % (
                     epoch,
-                    train_config['n_epochs'],
+                    train_config["n_epochs"],
                     i,
                     len(dataloader),
                     ssim.ssim(g_SDCT, trueSDCT),
@@ -249,29 +293,45 @@ def train():
             )
 
             # If at sample interval save image
-            if batches_done % model_config['sample_interval'] == 0:
+            if batches_done % model_config["sample_interval"] == 0:
                 outimages, ssim_score, psnr_score = sample_images(batches_done)
-                print("eval:",ssim_score,psnr_score)
+                print("eval:", ssim_score, psnr_score)
                 if use_wandb:
-                    wandb.log({
-                        "Epoch": epoch,
-                        "BGAN_D loss": loss_BD.item(),
-                        "BGAN_G loss": loss_BG.item(),
-                        "BGAN pixel loss": loss_B_pixel.item(),
-                        "DBGAN_D loss": loss_BD.item(),
-                        "DBGAN_G loss": loss_BG.item(),
-                        "DBGAN pixel loss": loss_B_pixel.item(),
-                        "ssim_score": ssim_score,
-                        "psnr_score": psnr_score,
-                        "generated_images": [wandb.Image(outimages)]
-                    })
+                    wandb.log(
+                        {
+                            "Epoch": epoch,
+                            "BGAN_D loss": loss_BD.item(),
+                            "BGAN_G loss": loss_BG.item(),
+                            "BGAN pixel loss": loss_B_pixel.item(),
+                            "DBGAN_D loss": loss_BD.item(),
+                            "DBGAN_G loss": loss_BG.item(),
+                            "DBGAN pixel loss": loss_B_pixel.item(),
+                            "ssim_score": ssim_score,
+                            "psnr_score": psnr_score,
+                            "generated_images": [
+                                wandb.Image(
+                                    outimages,
+                                    caption="加噪模拟的ULDCT, 使用BGAN生成的ULDCT, 对BGAN生成的ULDCT进行重建的SDCT, 真实的SDCT, 真实的LDCT, 对SDCT加噪得到的LDCT",
+                                )
+                            ],
+                        }
+                    )
 
-        if model_config['checkpoint_interval'] != -1 and epoch % model_config['checkpoint_interval'] == 0:
+        if (
+            model_config["checkpoint_interval"] != -1
+            and epoch % model_config["checkpoint_interval"] == 0
+        ):
             # Save model checkpoints
-            torch.save(db_generator.state_dict(),
-                       "mydualgan/saved_models/%s/db_generator_%d.pth" % (model_config['dataset_name'], epoch))
-            torch.save(db_discriminator.state_dict(),
-                       "mydualgan/saved_models/%s/db_discriminator_%d.pth" % (model_config['dataset_name'], epoch))
+            torch.save(
+                db_generator.state_dict(),
+                "mydualgan/saved_models/%s/db_generator_%d.pth"
+                % (model_config["dataset_name"], epoch),
+            )
+            torch.save(
+                db_discriminator.state_dict(),
+                "mydualgan/saved_models/%s/db_discriminator_%d.pth"
+                % (model_config["dataset_name"], epoch),
+            )
 
 
 ## 待修改
@@ -280,21 +340,32 @@ def sample_images(batches_done):
     train_imgs = next(iter(val_dataloader))
     trueSDCT = train_imgs["TrueSDCT"].to(device)  # 真实的SDCT
     fakeULDCT = train_imgs["FakeULDCT"].to(device)  # 加噪0.8SDCT得到的假ULDCT
-
-    g_SDCT = db_generator(fakeULDCT)
+    trueLDCT = train_imgs["TrueLDCT"].to(device)  # 真实的LDCT
+    fakeLDCT = train_imgs["FakeLDCT"].to(device)  # 加噪0.9SDCT得到的假LDCT
+    ULDCT = b_generator(fakeULDCT)
+    g_SDCT = db_generator(ULDCT)
 
     trueSDCT = make_grid(trueSDCT, nrow=5, normalize=True)
     fakeULDCT = make_grid(fakeULDCT, nrow=5, normalize=True)
+    ULDCT = make_grid(ULDCT, nrow=5, normalize=True)
     g_SDCT = make_grid(g_SDCT, nrow=5, normalize=True)
-    
-    train_image_grid = torch.cat((fakeULDCT, g_SDCT, trueSDCT), 1)
+    trueLDCT = make_grid(trueLDCT, nrow=5, normalize=True)
+    fakeLDCT = make_grid(fakeLDCT, nrow=5, normalize=True)
 
-    save_image(train_image_grid, "mydualgan/outputs/%s/%s.png" % (model_config['dataset_name'], batches_done), nrow=5,
-               normalize=True)
+    train_image_grid = torch.cat(
+        (fakeULDCT, ULDCT, g_SDCT, trueSDCT, trueLDCT, fakeLDCT), 1
+    )
+
+    save_image(
+        train_image_grid,
+        "mydualgan/outputs/%s/%s.png" % (model_config["dataset_name"], batches_done),
+        nrow=5,
+        normalize=True,
+    )
     ssim_score = ssim.ssim(g_SDCT, trueSDCT)
     psnr_score = psnr.psnr(g_SDCT, trueSDCT)
     return train_image_grid, ssim_score, psnr_score
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     train()

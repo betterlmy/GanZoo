@@ -59,11 +59,11 @@ model:
     n_cpu: 8
     n_residual_blocks: 9
     sample_interval: 20
-project_dir: /home/deng/dzn/l/GanZoo
+project_dir: /root/lmy/GanZoo
 train:
   batch_size: 256
-  gpu_id: '1'
+  gpu_id: '5'
   model_save_interval: 400
   n_epochs: 2000
   print_interval: 50
-  use_wandb: false
+  use_wandb: true

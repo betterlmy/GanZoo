@@ -1,3 +1,0 @@
-nohup: ignoring input
-/home/deng/anaconda3/envs/cycle_tmp/lib/python3.10/site-packages/torchvision/transforms/transforms.py:332: UserWarning: Argument 'interpolation' of type int is deprecated since 0.13 and will be removed in 0.15. Please use InterpolationMode enum.
-  warnings.warn(
