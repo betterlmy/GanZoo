@@ -26,7 +26,7 @@ def add_poisson_noise(image, scale=1.0):
 
     scaled_image = image * scale 
     noisy_image = torch.poisson(scaled_image)/scale
-    save_image(noisy_image, 'noisy_image.png')
+    # save_image(noisy_image, 'noisy_image.png')
 
     return noisy_image*2-1 # 反归一化到(-1,1)
 
@@ -62,10 +62,10 @@ class ImageDataset(Dataset):
 
         TrueSDCT = self.transform(image_A)
         TrueLDCT = self.transform(image_B)
-        save_image(TrueSDCT, 'image1.png')
+        # save_image(TrueSDCT, 'image1.png')
 
-        FakeLDCT = add_poisson_noise(TrueSDCT,80)
-        FakeULDCT = add_poisson_noise(TrueSDCT,10)
+        FakeLDCT = add_poisson_noise(TrueSDCT,70)
+        FakeULDCT = add_poisson_noise(TrueSDCT,50)
 
         return {
             "TrueSDCT": TrueSDCT, 

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import time
 import sys
 import os
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
@@ -54,7 +55,7 @@ device = torch.device("cuda:" + train_config['gpu_id'] if cuda else "cpu")
 if cuda:
     db_generator = db_generator.to(device)
     db_discriminator = db_discriminator.to(device)
-    
+
     b_generator = b_generator.to(device)
     b_discriminator = b_discriminator.to(device)
     criterion_GAN.to(device)
@@ -81,13 +82,13 @@ else:
 
 # Optimizers
 optimizer_DBG = torch.optim.Adam(db_generator.parameters(), lr=model_config['lr'],
-                               betas=(model_config['b1'], model_config['b2']))
+                                 betas=(model_config['b1'], model_config['b2']))
 optimizer_DBD = torch.optim.Adam(db_discriminator.parameters(), lr=model_config['lr'],
-                               betas=(model_config['b1'], model_config['b2']))
+                                 betas=(model_config['b1'], model_config['b2']))
 optimizer_BG = torch.optim.Adam(b_generator.parameters(), lr=model_config['lr'],
-                               betas=(model_config['b1'], model_config['b2']))
+                                betas=(model_config['b1'], model_config['b2']))
 optimizer_BD = torch.optim.Adam(b_discriminator.parameters(), lr=model_config['lr'],
-                               betas=(model_config['b1'], model_config['b2']))
+                                betas=(model_config['b1'], model_config['b2']))
 
 transforms_ = [
     transforms.Resize((model_config['img_size'], model_config['img_size']), Image.BICUBIC),
@@ -124,28 +125,26 @@ test_dataloader = DataLoader(
 def train():
     prev_time = time.time()
     for epoch in range(model_config['epoch'], train_config['n_epochs']):
-        for i, batch in enumerate(dataloader):    
-            trueSDCT = batch["TrueSDCT"].to(device) # 真实的SDCT
-            trueLDCT = batch["TrueLDCT"].to(device) # 真实的LDCT
-            fakeLDCT = batch["FakeLDCT"].to(device) # 加噪0.9SDCT得到的假LDCT
-            fakeULDCT = batch["FakeULDCT"].to(device) # 加噪0.8SDCT得到的假ULDCT
-            
+        for i, batch in enumerate(dataloader):
+            trueSDCT = batch["TrueSDCT"].to(device)  # 真实的SDCT
+            trueLDCT = batch["TrueLDCT"].to(device)  # 真实的LDCT
+            fakeLDCT = batch["FakeLDCT"].to(device)  # 加噪0.9SDCT得到的假LDCT
+            fakeULDCT = batch["FakeULDCT"].to(device)  # 加噪0.8SDCT得到的假ULDCT
+
             # Adversarial ground truths
             valid = torch.ones((trueLDCT.size(0), *patch), dtype=torch.float32, requires_grad=False).to(device)
             fake = torch.zeros((trueLDCT.size(0), *patch), dtype=torch.float32, requires_grad=False).to(device)
-            
-            
+
             # BGAN的训练使用到模拟的LDCT和真实的LDCT  学习模拟的LDCT到真实LDCT的映射关系 因此
             b_generator.train()
-            b_discriminator.train()
+            b_discriminator.eval()
             db_generator.eval()
             db_discriminator.eval()
- 
             optimizer_BG.zero_grad()
             g_LDCT = b_generator(fakeLDCT)  # 给出加噪得到的LDCT图像 用来模拟真实的LDCT
             pred_fake1 = b_discriminator(g_LDCT, fakeLDCT)
             loss_GAN1 = criterion_GAN(pred_fake1, valid)
-            
+
             # Pixel-wise loss
             loss_B_pixel = criterion_pixelwise(g_LDCT, trueLDCT)
 
@@ -154,8 +153,12 @@ def train():
 
             loss_BG.backward()
             optimizer_BG.step()
-            
+
             # 训练BGAN_D
+            b_generator.eval()
+            b_discriminator.train()
+            db_generator.eval()
+            db_discriminator.eval()
             optimizer_BD.zero_grad()
             # Real loss
             pred_real2 = b_discriminator(fakeLDCT, trueLDCT)
@@ -171,22 +174,19 @@ def train():
             loss_BD.backward()
             optimizer_BD.step()
 
-
-
-
-            # DBGAN的训练使用到了训练好的BGAN_G来生成模拟的ULDCT和真实的SDCT数据 之间的映射  学习模拟的ULDCT到真实SDCT的映射关系 因此 
+            # DBGAN的训练使用到了训练好的BGAN_G来生成模拟的ULDCT和真实的SDCT数据 之间的映射  学习模拟的ULDCT到真实SDCT的映射关系 因此
             b_generator.eval()
             b_discriminator.eval()
             db_generator.train()
-            db_discriminator.train()
+            db_discriminator.eval()
 
-            ULDCT = b_generator(fakeULDCT) # 生成虚假的ULDCT 也就是模拟出来的ULDCT
-            
+            ULDCT = b_generator(fakeULDCT).detach()  # 生成虚假的ULDCT 也就是模拟出来的ULDCT
+
             optimizer_DBG.zero_grad()
-            g_SDCT = db_generator(ULDCT) # g_SDCT为去噪后的清晰CT
-            pred_fake3 = db_discriminator(g_SDCT, ULDCT) 
+            g_SDCT = db_generator(ULDCT)  # g_SDCT为去噪后的清晰CT
+            pred_fake3 = db_discriminator(g_SDCT, ULDCT)
             loss_GAN3 = criterion_GAN(pred_fake3, valid)
-            
+
             # Pixel-wise loss
             loss_DB_pixel = criterion_pixelwise(g_SDCT, trueSDCT)
 
@@ -195,11 +195,15 @@ def train():
 
             loss_DBG.backward()
             optimizer_DBG.step()
-            
+
+            b_generator.eval()
+            b_discriminator.eval()
+            db_generator.eval()
+            db_discriminator.train()
             # 训练DBGAN_D
             optimizer_DBD.zero_grad()
             # Real loss
-            pred_real4 = db_discriminator(ULDCT, trueSDCT)
+            pred_real4 = db_discriminator(trueSDCT, ULDCT)
             loss_real4 = criterion_GAN(pred_real4, valid)
             # loss_real4.retain_graph=True
 
@@ -213,8 +217,6 @@ def train():
 
             loss_DBD.backward()
             optimizer_DBD.step()
-            
-
 
             # --------------
             #  Log Progress
@@ -226,15 +228,16 @@ def train():
             batches_left = train_config['n_epochs'] * len(dataloader) - batches_done
             time_left = timedelta(seconds=batches_left * (time.time() - prev_time))  # 计算剩余时间
             prev_time = time.time()
-
             # Print log
             sys.stdout.write(
-                "\r[Epoch %d/%d] [Batch %d/%d] [BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
+                "\r[Epoch %d/%d] [Batch %d/%d] [PSNR:%f][SSIM:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
                 % (
                     epoch,
                     train_config['n_epochs'],
                     i,
                     len(dataloader),
+                    ssim.ssim(g_SDCT, trueSDCT),
+                    psnr.psnr(g_SDCT, trueSDCT),
                     loss_BD.item(),
                     loss_BG.item(),
                     loss_B_pixel.item(),
@@ -245,21 +248,23 @@ def train():
                 )
             )
 
-            # # If at sample interval save image
-            # if batches_done % model_config['sample_interval'] == 0:
-            #     outimages, ssim_score, psnr_score = sample_images(batches_done)
-
-            #     if use_wandb:
-            #         wandb.log({
-            #             "Epoch": epoch,
-            #             "D loss": loss_D.item(),
-            #             "G loss": loss_G.item(),
-            #             "pixel loss": loss_pixel.item(),
-            #             "GAN loss": loss_GAN.item(),
-            #             "ssim_score": ssim_score,
-            #             "psnr_score": psnr_score,
-            #             "generated_images": [wandb.Image(outimages)]
-            #         })
+            # If at sample interval save image
+            if batches_done % model_config['sample_interval'] == 0:
+                outimages, ssim_score, psnr_score = sample_images(batches_done)
+                print("eval:",ssim_score,psnr_score)
+                if use_wandb:
+                    wandb.log({
+                        "Epoch": epoch,
+                        "BGAN_D loss": loss_BD.item(),
+                        "BGAN_G loss": loss_BG.item(),
+                        "BGAN pixel loss": loss_B_pixel.item(),
+                        "DBGAN_D loss": loss_BD.item(),
+                        "DBGAN_G loss": loss_BG.item(),
+                        "DBGAN pixel loss": loss_B_pixel.item(),
+                        "ssim_score": ssim_score,
+                        "psnr_score": psnr_score,
+                        "generated_images": [wandb.Image(outimages)]
+                    })
 
         if model_config['checkpoint_interval'] != -1 and epoch % model_config['checkpoint_interval'] == 0:
             # Save model checkpoints
@@ -273,21 +278,23 @@ def train():
 def sample_images(batches_done):
     """Saves a generated sample from the validation set"""
     train_imgs = next(iter(val_dataloader))
-    real_A = train_imgs["A"].to(device)
-    real_B = train_imgs["B"].to(device)
-    fake_A = db_generator(real_B)
+    trueSDCT = train_imgs["TrueSDCT"].to(device)  # 真实的SDCT
+    fakeULDCT = train_imgs["FakeULDCT"].to(device)  # 加噪0.8SDCT得到的假ULDCT
 
-    real_A = make_grid(real_A, nrow=5, normalize=True)
-    real_B = make_grid(real_B, nrow=5, normalize=True)
-    fake_A = make_grid(fake_A, nrow=5, normalize=True)
-    train_image_grid = torch.cat((real_B, fake_A, real_A), 1)
+    g_SDCT = db_generator(fakeULDCT)
 
+    trueSDCT = make_grid(trueSDCT, nrow=5, normalize=True)
+    fakeULDCT = make_grid(fakeULDCT, nrow=5, normalize=True)
+    g_SDCT = make_grid(g_SDCT, nrow=5, normalize=True)
+    
+    train_image_grid = torch.cat((fakeULDCT, g_SDCT, trueSDCT), 1)
 
     save_image(train_image_grid, "mydualgan/outputs/%s/%s.png" % (model_config['dataset_name'], batches_done), nrow=5,
                normalize=True)
-    ssim_score = ssim.ssim(fake_A, real_A)
-    psnr_score = psnr.psnr(fake_A, real_A)
+    ssim_score = ssim.ssim(g_SDCT, trueSDCT)
+    psnr_score = psnr.psnr(g_SDCT, trueSDCT)
     return train_image_grid, ssim_score, psnr_score
+
 
 if __name__ == '__main__':
     train()
