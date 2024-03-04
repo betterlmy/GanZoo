@@ -15,6 +15,7 @@ def to_rgb(image):
     rgb_image.paste(image)
     return rgb_image
 
+
 def add_poisson_noise(image, scale=1.0):
     """
     Apply Poisson noise to the input image.
@@ -22,24 +23,41 @@ def add_poisson_noise(image, scale=1.0):
     :param scale: scale factor for the input image
     :return: noisy image
     """
-    image = (image+1)/2 # 归一化到[0,1]
+    image = (image + 1) / 2  # 归一化到[0,1]
 
-    scaled_image = image * scale 
-    noisy_image = torch.poisson(scaled_image)/scale
+    scaled_image = image * scale
+    noisy_image = torch.poisson(scaled_image) / scale
     # save_image(noisy_image, 'noisy_image.png')
 
-    return noisy_image*2-1 # 反归一化到(-1,1)
+    return noisy_image * 2 - 1  # 反归一化到(-1,1)
 
 
 class ImageDataset(Dataset):
     """p2p要求成对的数据集"""
 
-    def __init__(self, rootA, transforms_=None, unaligned=False, mode="train", rgb=False):
+    def __init__(
+        self,
+        rootA,
+        transforms_=[
+            transforms.Resize((256, 256), Image.BICUBIC),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5,), (0.5,)),  # 单通道
+        ],
+        unaligned=False,
+        mode="train",
+        rgb=False,
+        max_nums=None,
+    ):
         self.transform = transforms.Compose(transforms_)
         self.unaligned = unaligned
 
         self.files_A = sorted(glob.glob(os.path.join(rootA, "high") + "/*.png"))
         self.files_B = sorted(glob.glob(os.path.join(rootA, "low") + "/*.png"))
+        if max_nums:
+            indices = np.random.choice(len(self.files_A), max_nums, replace=False)
+            self.files_A = [self.files_A[i] for i in indices]
+            self.files_B = [self.files_B[i] for i in indices]
+
         self.rgb = rgb
 
     def __getitem__(self, index):
@@ -64,15 +82,23 @@ class ImageDataset(Dataset):
         TrueLDCT = self.transform(image_B)
         # save_image(TrueSDCT, 'image1.png')
 
-        FakeLDCT = add_poisson_noise(TrueSDCT,70)
-        FakeULDCT = add_poisson_noise(TrueSDCT,50)
+        FakeLDCT = add_poisson_noise(TrueSDCT, 70)
+        FakeULDCT = add_poisson_noise(TrueSDCT, 50)
 
         return {
-            "TrueSDCT": TrueSDCT, 
+            "TrueSDCT": TrueSDCT,
             "TrueLDCT": TrueLDCT,
-            "FakeLDCT": FakeLDCT, 
-            "FakeULDCT": FakeULDCT,           
+            "FakeLDCT": FakeLDCT,
+            "FakeULDCT": FakeULDCT,
         }
 
     def __len__(self):
         return max(len(self.files_A), len(self.files_B))
+
+
+if __name__ == "__main__":
+    root = "/root/lmy/aapm256"
+    dataset = ImageDataset(root, mode="train", max_nums=100)
+    print(len(dataset))
+
+    print(dataset[0]['TrueSDCT'].shape)

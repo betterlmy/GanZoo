@@ -6,7 +6,7 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from torchvision.utils import save_image, make_grid
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from mydualgan.datasets import ImageDataset
 from mydualgan.models import GeneratorUNet, Discriminator, weights_init_normal
 from evalution import ssim, psnr
@@ -125,32 +125,40 @@ transforms_ = [
     transforms.Normalize((0.5,), (0.5,)),  # 单通道
 ]
 
+max_nums = 500
+
+aapm_data = ImageDataset(
+    # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
+    "/root/lmy/aapm256",
+    transforms_=transforms_,
+    max_nums=max_nums,
+)
+
+
+train_size = int(0.8 * max_nums)
+test_size = max_nums - train_size
+
+train_dataset, test_dataset = random_split(aapm_data, [train_size, test_size])
+
 dataloader = DataLoader(
-    ImageDataset(
-        os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
-        transforms_=transforms_,
-    ),
+    train_dataset,
     batch_size=model_config["batch_size"],
     shuffle=True,
 )
-
 val_dataloader = DataLoader(
-    ImageDataset(
-        os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
-        transforms_=transforms_,
-    ),
+    test_dataset,
     batch_size=5,
     shuffle=False,
 )
-
-test_dataloader = DataLoader(
-    ImageDataset(
-        os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
-        transforms_=transforms_,
-    ),
-    batch_size=5,
-    shuffle=False,
-)
+# val_dataloader = DataLoader(
+#     ImageDataset(
+#         "/root/lmy/aapm256",
+#         # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
+#         transforms_=transforms_,
+#     ),
+#     batch_size=5,
+#     shuffle=False,
+# )
 
 
 # ----------
