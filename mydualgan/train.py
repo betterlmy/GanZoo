@@ -7,7 +7,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader, random_split
-from mydualgan.datasets import ImageDataset
+from mydualgan.datasets import ImageDataset, ImageDatasetGPU1
 from mydualgan.models import GeneratorUNet, Discriminator, weights_init_normal
 from evalution import ssim, psnr
 from utils import config
@@ -41,7 +41,8 @@ lambda_pixel = 100
 
 # Calculate output of image discriminator (PatchGAN)
 patch = (1, model_config["img_size"] // 2**4, model_config["img_size"] // 2**4)
-
+patch = (1,16,16)
+print("patchsize",patch)
 db_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
 db_discriminator = Discriminator(model_config["channels"])
 
@@ -125,14 +126,30 @@ transforms_ = [
     transforms.Normalize((0.5,), (0.5,)),  # 单通道
 ]
 
-max_nums = 500
+max_nums = 10000
 
-aapm_data = ImageDataset(
-    # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
-    "/root/lmy/aapm256",
-    transforms_=transforms_,
-    max_nums=max_nums,
-)
+# aapm_data = ImageDataset(
+#     # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
+#     "/root/lmy/aapm256",
+#     transforms_=transforms_,
+#     max_nums=max_nums,
+# )
+
+if model_config["img_size"]==256:
+    aapm_data = ImageDatasetGPU1(
+        # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
+        "/root/lmy/aapm256",
+        transforms_=transforms_,
+        device=device,
+        max_nums=max_nums,
+    )
+if model_config["img_size"]==512:
+    max_nums //=4
+    aapm_data = ImageDatasetGPU1(
+            "/root/lmy/aapm512",
+            device=device,
+            max_nums=max_nums,
+        )
 
 
 train_size = int(0.8 * max_nums)
