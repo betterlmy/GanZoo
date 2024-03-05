@@ -167,6 +167,7 @@ class ImageDatasetGPU1(Dataset):
         max_nums=None,
     ):
         self.transform = transforms.Compose(transforms_)
+        print("数据集路径:",rootA)
         self.files_A = sorted(glob.glob(os.path.join(rootA, "high") + "/*.png"))
         self.files_B = sorted(glob.glob(os.path.join(rootA, "low") + "/*.png"))
         self.TrueSDCTs = []
@@ -175,7 +176,7 @@ class ImageDatasetGPU1(Dataset):
         self.FakeULDCTs = []
 
         if max_nums:
-            print(max_nums)
+            print("数据集大小:",max_nums)
             indices = np.random.choice(len(self.files_A), max_nums, replace=False)
             self.files_A = [self.files_A[i] for i in indices]
             self.files_B = [self.files_B[i] for i in indices]
@@ -191,7 +192,7 @@ class ImageDatasetGPU1(Dataset):
         for thread in threads:
             thread.join()
 
-        print(max_nums,"dataset load to GPU successful")
+        print("dataset load to GPU successful")
 
     def process_images(self, index, device):
         image_A = Image.open(self.files_A[index % len(self.files_A)])

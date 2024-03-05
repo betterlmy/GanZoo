@@ -138,17 +138,16 @@ max_nums = 10000
 if model_config["img_size"]==256:
     aapm_data = ImageDatasetGPU1(
         # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
-        "/root/lmy/aapm256",
+        os.path.join(os.path.dirname(configs["project_dir"]),"aapm256"),
         transforms_=transforms_,
         device=device,
         max_nums=max_nums,
     )
 if model_config["img_size"]==512:
-    max_nums //=4
     aapm_data = ImageDatasetGPU1(
-            "/root/lmy/aapm512",
+            os.path.join(os.path.dirname(configs["project_dir"]),"aapm512"),
             device=device,
-            max_nums=max_nums,
+            max_nums=max_nums//4,
         )
 
 
