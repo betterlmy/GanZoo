@@ -7,8 +7,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader, random_split
-from mydualgan.datasets import ImageDataset, ImageDatasetGPU1
-from mydualgan.models import GeneratorUNet, Discriminator, weights_init_normal
+from swinDDGM.datasets import ImageDatasetGPU1
+from swinDDGM.models import Discriminator, weights_init_normal
 from evalution import ssim, psnr
 from utils import config
 import torch
@@ -17,20 +17,20 @@ from PIL import Image
 import torchvision.transforms as transforms
 import wandb
 from swinunet import get_swinunet
-"""！！！训练时 将workdir设置为GanZoo的根目录 而非mydualgan的根目录"""
+"""！！！训练时 将workdir设置为GanZoo的根目录 而非swinDDGM的根目录"""
 
 config_file = "config_default.yaml"
 configs = config.update_project_dir(config_file)
-model_config = configs["model"]["mydualgan"]
+model_config = configs["model"]["swinDDGM"]
 train_config = configs["train"]
 use_wandb = train_config["use_wandb"]
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
 
 if use_wandb:
-    wandb.init(project="gans", name="mydualgan" + formatted_date, config=configs)
+    wandb.init(project="gans", name="swinDDGM" + formatted_date, config=configs)
 
-os.makedirs("mydualgan/outputs/%s" % model_config["dataset_name"], exist_ok=True)
-os.makedirs("mydualgan/saved_models/%s" % model_config["dataset_name"], exist_ok=True)
+os.makedirs("swinDDGM/outputs/%s" % model_config["dataset_name"], exist_ok=True)
+os.makedirs("swinDDGM/saved_models/%s" % model_config["dataset_name"], exist_ok=True)
 
 # Losses
 criterion_GAN = torch.nn.MSELoss()
@@ -44,11 +44,11 @@ patch = (1, model_config["img_size"] // 2**4, model_config["img_size"] // 2**4)
 patch = (1,16,16)
 print("patchsize",patch)
 # db_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
-db_generator = get_swinunet(img_size=256, in_channels=1)])
+db_generator = get_swinunet(img_size=model_config["img_size"], in_channels=1)
 db_discriminator = Discriminator(model_config["channels"])
 
 # b_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
-b_generator= get_swinunet(img_size=256, in_channels=1)
+b_generator= get_swinunet(img_size=model_config["img_size"], in_channels=1)
 b_discriminator = Discriminator(model_config["channels"])
 
 cuda = torch.cuda.is_available()
@@ -130,12 +130,6 @@ transforms_ = [
 
 max_nums = 10000
 
-# aapm_data = ImageDataset(
-#     # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
-#     "/root/lmy/aapm256",
-#     transforms_=transforms_,
-#     max_nums=max_nums,
-# )
 
 if model_config["img_size"]==256:
     aapm_data = ImageDatasetGPU1(
@@ -146,15 +140,14 @@ if model_config["img_size"]==256:
         max_nums=max_nums,
     )
 if model_config["img_size"]==512:
-    max_nums //=4
     aapm_data = ImageDatasetGPU1(
             "/root/lmy/aapm512",
             device=device,
-            max_nums=max_nums,
+            max_nums=max_nums//4,
         )
 
 
-train_size = int(0.8 * max_nums)
+train_size = int(0.9 * max_nums)
 test_size = max_nums - train_size
 
 train_dataset, test_dataset = random_split(aapm_data, [train_size, test_size])
@@ -351,12 +344,12 @@ def train():
             # Save model checkpoints
             torch.save(
                 db_generator.state_dict(),
-                "mydualgan/saved_models/%s/db_generator_%d.pth"
+                "swinDDGM/saved_models/%s/db_generator_%d.pth"
                 % (model_config["dataset_name"], epoch),
             )
             torch.save(
                 db_discriminator.state_dict(),
-                "mydualgan/saved_models/%s/db_discriminator_%d.pth"
+                "swinDDGM/saved_models/%s/db_discriminator_%d.pth"
                 % (model_config["dataset_name"], epoch),
             )
 
@@ -385,7 +378,7 @@ def sample_images(batches_done):
 
     save_image(
         train_image_grid,
-        "mydualgan/outputs/%s/%s.png" % (model_config["dataset_name"], batches_done),
+        "swinDDGM/outputs/%s/%s.png" % (model_config["dataset_name"], batches_done),
         nrow=5,
         normalize=True,
     )

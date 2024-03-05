@@ -7,7 +7,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader, random_split
-from mydualgan.datasets import ImageDataset, ImageDatasetGPU1
+from mydualgan.datasets import ImageDatasetGPU1
 from mydualgan.models import GeneratorUNet, Discriminator, weights_init_normal
 from evalution import ssim, psnr
 from utils import config
