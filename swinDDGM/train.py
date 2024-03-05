@@ -1,4 +1,3 @@
-import itertools
 from datetime import datetime, timedelta
 import time
 import sys
@@ -40,15 +39,15 @@ criterion_pixelwise = torch.nn.L1Loss()
 lambda_pixel = 100
 
 # Calculate output of image discriminator (PatchGAN)
-patch = (1, model_config["img_size"] // 2**4, model_config["img_size"] // 2**4)
+# patch = (1, model_config["img_size"] // 2**4, model_config["img_size"] // 2**4)
 patch = (1,16,16)
 print("patchsize",patch)
 # db_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
-db_generator = get_swinunet(img_size=model_config["img_size"], in_channels=1)
+db_generator = get_swinunet(img_size=model_config["img_size"], in_channels=model_config["channels"])
 db_discriminator = Discriminator(model_config["channels"])
 
 # b_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
-b_generator= get_swinunet(img_size=model_config["img_size"], in_channels=1)
+b_generator= get_swinunet(img_size=model_config["img_size"], in_channels=model_config["channels"])
 b_discriminator = Discriminator(model_config["channels"])
 
 cuda = torch.cuda.is_available()
@@ -128,7 +127,7 @@ transforms_ = [
     transforms.Normalize((0.5,), (0.5,)),  # 单通道
 ]
 
-max_nums = 10000
+max_nums = model_config["max_nums"]
 
 
 if model_config["img_size"]==256:

@@ -45,7 +45,6 @@ class ImageDataset(Dataset):
             transforms.Normalize((0.5,), (0.5,)),  # 单通道
         ],
         unaligned=False,
-        mode="train",
         rgb=False,
         max_nums=None,
     ):
@@ -162,9 +161,9 @@ class ImageDatasetGPU1(Dataset):
         transforms_=[
             transforms.Resize((256, 256), Image.BICUBIC),
             transforms.ToTensor(),
-            transforms.Normalize((0.5,), (0.5,)),  # ?~M~U?~@~Z?~A~S
+            transforms.Normalize((0.5,), (0.5,)), 
         ],
-        device="cuda:6",
+        device="cuda",
         max_nums=None,
     ):
         self.transform = transforms.Compose(transforms_)
