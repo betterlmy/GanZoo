@@ -7,8 +7,8 @@ import torch
 from torch.utils.data import Dataset
 from PIL import Image
 import torchvision.transforms as transforms
-from torchvision.utils import save_image
-
+import time
+# from torchvision.utils import save_image
 
 def to_rgb(image):
     """Converts image to rgb if it is grayscale"""
@@ -193,6 +193,7 @@ class ImageDatasetGPU1(Dataset):
             thread.join()
 
         print("dataset load to GPU successful")
+
 
     def process_images(self, index, device):
         image_A = Image.open(self.files_A[index % len(self.files_A)])

@@ -62,7 +62,7 @@ model:
   swinDDGM:
     b1: 0.5
     b2: 0.999
-    batch_size: 64
+    batch_size: 32
     channels: 1
     checkpoint_interval: 100
     dataset_name: aapm512
@@ -77,11 +77,11 @@ model:
     n_cpu: 8
     n_residual_blocks: 9
     sample_interval: 20
-project_dir: /root/lmy/GanZoo
+project_dir: /home/deng/dzn/l/GanZoo
 train:
   batch_size: 256
-  gpu_id: '7'
+  gpu_id: '1'
   model_save_interval: 400
   n_epochs: 2000
   print_interval: 50
-  use_wandb: true
+  use_wandb: false

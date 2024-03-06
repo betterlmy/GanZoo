@@ -26,8 +26,6 @@ train_config = configs["train"]
 use_wandb = train_config["use_wandb"]
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
 
-if use_wandb:
-    wandb.init(project="gans", name="swinDDGM" + formatted_date, config=configs)
 
 os.makedirs("swinDDGM/outputs/%s" % model_config["dataset_name"], exist_ok=True)
 os.makedirs("swinDDGM/saved_models/%s" % model_config["dataset_name"], exist_ok=True)
@@ -60,13 +58,24 @@ device = torch.device("cuda:" + train_config["gpu_id"] if cuda else "cpu")
 
 if cuda:
     db_generator = db_generator.to(device)
+
     db_discriminator = db_discriminator.to(device)
+
 
     b_generator = b_generator.to(device)
     b_discriminator = b_discriminator.to(device)
+    dbgparam= sum(p.numel() for p in db_generator.parameters())
+    dbdparam= sum(p.numel() for p in db_discriminator.parameters())
+    print("g参数量:%d,g参数量:%d,总参数量:%.2f",dbgparam,dbdparam,(dbgparam+dbdparam)*2/1e6)
+
     criterion_GAN.to(device)
     criterion_pixelwise.to(device)
+    torch.cuda.set_device(device)
     print("current device:" + str(device))
+    current_allocated = torch.cuda.memory_allocated()
+    print(f"Current allocated memory: {current_allocated / 1024 ** 2} MB")
+
+
 
 if model_config["epoch"] != 0:
     # Load pretrained models
@@ -186,9 +195,13 @@ val_dataloader = DataLoader(
 
 
 def train():
+    if use_wandb:
+        wandb.init(project="gans", name="swinDDGM" + formatted_date, config=configs)
+
     prev_time = time.time()
     for epoch in range(model_config["epoch"], train_config["n_epochs"]):
         for i, batch in enumerate(dataloader):
+            torch.cuda.empty_cache()
             trueSDCT = batch["TrueSDCT"].to(device)  # 真实的SDCT
             trueLDCT = batch["TrueLDCT"].to(device)  # 真实的LDCT
             fakeLDCT = batch["FakeLDCT"].to(device)  # 加噪0.9SDCT得到的假LDCT
@@ -413,6 +426,7 @@ def sample_images(batches_done):
         train_image_grid,
         ssim_score,
         psnr_score,
+        rmse_score
     )
 
 
