@@ -8,7 +8,7 @@ from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader, random_split
 from swinDDGM.datasets import ImageDatasetGPU1
 from swinDDGM.models import Discriminator, weights_init_normal
-from evalution import ssim, psnr
+from evalution import ssim, psnr, rmse
 from utils import config
 import torch
 import os
@@ -16,6 +16,7 @@ from PIL import Image
 import torchvision.transforms as transforms
 import wandb
 from swinunet import get_swinunet
+
 """！！！训练时 将workdir设置为GanZoo的根目录 而非swinDDGM的根目录"""
 
 config_file = "config_default.yaml"
@@ -40,14 +41,18 @@ lambda_pixel = 100
 
 # Calculate output of image discriminator (PatchGAN)
 # patch = (1, model_config["img_size"] // 2**4, model_config["img_size"] // 2**4)
-patch = (1,16,16)
-print("patchsize",patch)
+patch = (1, 16, 16)
+print("patchsize", patch)
 # db_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
-db_generator = get_swinunet(img_size=model_config["img_size"], in_channels=model_config["channels"])
+db_generator = get_swinunet(
+    img_size=model_config["img_size"], in_channels=model_config["channels"]
+)
 db_discriminator = Discriminator(model_config["channels"])
 
 # b_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
-b_generator= get_swinunet(img_size=model_config["img_size"], in_channels=model_config["channels"])
+b_generator = get_swinunet(
+    img_size=model_config["img_size"], in_channels=model_config["channels"]
+)
 b_discriminator = Discriminator(model_config["channels"])
 
 cuda = torch.cuda.is_available()
@@ -130,23 +135,23 @@ transforms_ = [
 max_nums = model_config["max_nums"]
 
 
-if model_config["img_size"]==256:
+if model_config["img_size"] == 256:
     aapm_data = ImageDatasetGPU1(
         # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
         # "/root/lmy/aapm256",
-        os.path.join(os.path.dirname(configs["project_dir"]),"aapm256"),
+        os.path.join(os.path.dirname(configs["project_dir"]), "aapm256"),
         transforms_=transforms_,
         device=device,
         max_nums=max_nums,
     )
-if model_config["img_size"]==512:
-    max_nums//=4
+if model_config["img_size"] == 512:
+    max_nums //= 4
     aapm_data = ImageDatasetGPU1(
-            # "/root/lmy/aapm512",
-            os.path.join(os.path.dirname(configs["project_dir"]),"aapm512"),
-            device=device,
-            max_nums=max_nums,
-        )
+        # "/root/lmy/aapm512",
+        os.path.join(os.path.dirname(configs["project_dir"]), "aapm512"),
+        device=device,
+        max_nums=max_nums,
+    )
 
 
 train_size = int(0.9 * max_nums)
@@ -296,7 +301,7 @@ def train():
             prev_time = time.time()
             # Print log
             sys.stdout.write(
-                "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
+                "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%.3f][PSNR:%.3f][RMSE:%.3f] ETA: %s"
                 % (
                     epoch,
                     train_config["n_epochs"],
@@ -304,19 +309,34 @@ def train():
                     len(dataloader),
                     ssim.ssim(g_SDCT, trueSDCT),
                     psnr.psnr(g_SDCT, trueSDCT),
-                    loss_BD.item(),
-                    loss_BG.item(),
-                    loss_B_pixel.item(),
-                    loss_DBD.item(),
-                    loss_DBG.item(),
-                    loss_DB_pixel.item(),
+                    rmse.rmse(g_SDCT, trueSDCT),
                     time_left,
                 )
             )
+            # sys.stdout.write(
+            #     "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
+            #     % (
+            #         epoch,
+            #         train_config["n_epochs"],
+            #         i,
+            #         len(dataloader),
+            #         ssim.ssim(g_SDCT, trueSDCT),
+            #         psnr.psnr(g_SDCT, trueSDCT),
+            #         loss_BD.item(),
+            #         loss_BG.item(),
+            #         loss_B_pixel.item(),
+            #         loss_DBD.item(),
+            #         loss_DBG.item(),
+            #         loss_DB_pixel.item(),
+            #         time_left,
+            #     )
+            # )
 
             # If at sample interval save image
             if batches_done % model_config["sample_interval"] == 0:
-                outimages, ssim_score, psnr_score = sample_images(batches_done)
+                outimages, ssim_score, psnr_score, rmse_score = sample_images(
+                    batches_done
+                )
                 print("eval:", ssim_score, psnr_score)
                 if use_wandb:
                     wandb.log(
@@ -330,6 +350,7 @@ def train():
                             "DBGAN pixel loss": loss_B_pixel.item(),
                             "ssim_score": ssim_score,
                             "psnr_score": psnr_score,
+                            "rmse_score": rmse_score,
                             "generated_images": [
                                 wandb.Image(
                                     outimages,
@@ -366,6 +387,7 @@ def sample_images(batches_done):
     fakeLDCT = train_imgs["FakeLDCT"].to(device)  # 加噪0.9SDCT得到的假LDCT
     ULDCT = b_generator(fakeULDCT)
     g_SDCT = db_generator(ULDCT)
+    rmse_score = rmse.rmse(g_SDCT, trueSDCT)
 
     trueSDCT = make_grid(trueSDCT, nrow=5, normalize=True)
     fakeULDCT = make_grid(fakeULDCT, nrow=5, normalize=True)
@@ -386,7 +408,12 @@ def sample_images(batches_done):
     )
     ssim_score = ssim.ssim(g_SDCT, trueSDCT)
     psnr_score = psnr.psnr(g_SDCT, trueSDCT)
-    return train_image_grid, ssim_score, psnr_score
+
+    return (
+        train_image_grid,
+        ssim_score,
+        psnr_score,
+    )
 
 
 if __name__ == "__main__":

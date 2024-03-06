@@ -13,3 +13,4 @@ web
 results/
 .idea
 outputs/
+*.out

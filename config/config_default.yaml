@@ -68,7 +68,7 @@ model:
     dataset_name: aapm512
     decay_epoch: 100
     epoch: 0
-    img_size: 512
+    img_size: 256
     lambda_cyc: 3.0
     lambda_id: 2.0
     latent_dim: 100
@@ -77,10 +77,10 @@ model:
     n_cpu: 8
     n_residual_blocks: 9
     sample_interval: 20
-project_dir: /home/deng/dzn/l/GanZoo
+project_dir: /root/lmy/GanZoo
 train:
   batch_size: 256
-  gpu_id: '1'
+  gpu_id: '7'
   model_save_interval: 400
   n_epochs: 2000
   print_interval: 50
