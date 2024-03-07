@@ -5,12 +5,11 @@ __pycache__/
 *.pth
 .wandb/
 data/
-.outputs
+#.outputs
 wandb/
 wandb
 web/
 web
 results/
 .idea
-outputs/
 nohup.out
