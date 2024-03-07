@@ -31,10 +31,10 @@ model:
     batch_size: 64
     channels: 1
     checkpoint_interval: 100
-    dataset_name: B301MM
+    dataset_name: aapm
     decay_epoch: 100
     epoch: 0
-    img_size: 256
+    img_size: 512
     lambda_cyc: 3.0
     lambda_id: 2.0
     latent_dim: 100
@@ -48,7 +48,6 @@ model:
     batch_size: 64
     channels: 1
     checkpoint_interval: 100
-    dataset_name: B301MM
     decay_epoch: 100
     epoch: 0
     img_size: 256
@@ -62,10 +61,9 @@ model:
   swinDDGM:
     b1: 0.5
     b2: 0.999
-    batch_size: 32
     channels: 1
     checkpoint_interval: 100
-    dataset_name: aapm512
+    dataset_name: aapm
     decay_epoch: 100
     epoch: 0
     img_size: 256
@@ -73,15 +71,16 @@ model:
     lambda_id: 2.0
     latent_dim: 100
     lr: 0.0002
-    max_nums: 10000
     n_cpu: 8
     n_residual_blocks: 9
     sample_interval: 20
-project_dir: /home/deng/dzn/l/GanZoo
+project_dir: /root/lmy/GanZoo
 train:
-  batch_size: 256
-  gpu_id: '1'
+  batch_size: 24
+  gpu_id: '3'
+  img_size: 256
+  max_nums: 8000
   model_save_interval: 400
   n_epochs: 2000
   print_interval: 50
-  use_wandb: false
+  use_wandb: true

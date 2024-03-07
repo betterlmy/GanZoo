@@ -40,7 +40,7 @@ criterion_pixelwise = torch.nn.L1Loss()
 lambda_pixel = 100
 
 # Calculate output of image discriminator (PatchGAN)
-patch = (1, model_config["img_size"] // 2**4, model_config["img_size"] // 2**4)
+patch = (1, train_config["img_size"] // 2**4, train_config["img_size"] // 2**4)
 patch = (1, 16, 16)
 print("patchsize", patch)
 db_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
@@ -120,13 +120,13 @@ optimizer_BD = torch.optim.Adam(
 
 transforms_ = [
     transforms.Resize(
-        (model_config["img_size"], model_config["img_size"]), Image.BICUBIC
+        (train_config["img_size"], train_config["img_size"]), Image.BICUBIC
     ),
     transforms.ToTensor(),
     transforms.Normalize((0.5,), (0.5,)),  # 单通道
 ]
 
-max_nums = 10000
+max_nums =int(train_config["max_nums"])
 
 # aapm_data = ImageDataset(
 #     # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
@@ -135,7 +135,7 @@ max_nums = 10000
 #     max_nums=max_nums,
 # )
 
-if model_config["img_size"] == 256:
+if train_config["img_size"] == 256:
     aapm_data = ImageDatasetGPU1(
         # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
         os.path.join(os.path.dirname(configs["project_dir"]), "aapm256"),
@@ -143,22 +143,23 @@ if model_config["img_size"] == 256:
         device=device,
         max_nums=max_nums,
     )
-if model_config["img_size"] == 512:
+if train_config["img_size"] == 512:
+    max_nums//=4
     aapm_data = ImageDatasetGPU1(
         os.path.join(os.path.dirname(configs["project_dir"]), "aapm512"),
         device=device,
-        max_nums=max_nums // 4,
+        max_nums=max_nums,
     )
 
 
-train_size = int(0.8 * max_nums)
+train_size = int(0.9 * max_nums)
 test_size = max_nums - train_size
 
 train_dataset, test_dataset = random_split(aapm_data, [train_size, test_size])
 
 dataloader = DataLoader(
     train_dataset,
-    batch_size=model_config["batch_size"],
+    batch_size=train_config["batch_size"],
     shuffle=True,
 )
 val_dataloader = DataLoader(

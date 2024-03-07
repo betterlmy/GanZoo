@@ -8,7 +8,10 @@ from torch.utils.data import Dataset
 from PIL import Image
 import torchvision.transforms as transforms
 import time
+from concurrent.futures import ThreadPoolExecutor
+
 # from torchvision.utils import save_image
+
 
 def to_rgb(image):
     """Converts image to rgb if it is grayscale"""
@@ -107,8 +110,9 @@ class ImageDatasetGPU(Dataset):
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,)),  # 单通道
         ],
-        device="cuda:6",
+        device="cuda",
         max_nums=None,
+        max_workers=100,
     ):
         self.transform = transforms.Compose(transforms_)
 
@@ -133,8 +137,8 @@ class ImageDatasetGPU(Dataset):
 
             TrueSDCT = self.transform(image_A).to(device)
             TrueLDCT = self.transform(image_B).to(device)
-            FakeLDCT = add_poisson_noise(TrueSDCT, 70).to(device)
-            FakeULDCT = add_poisson_noise(TrueSDCT, 50).to(device)
+            FakeLDCT = self.add_poisson_noise(TrueSDCT, 70)
+            FakeULDCT = self.add_poisson_noise(TrueSDCT, 50)
             self.TrueSDCTs.append(TrueSDCT)
             self.TrueLDCTs.append(TrueLDCT)
             self.FakeLDCTs.append(FakeLDCT)
@@ -153,6 +157,23 @@ class ImageDatasetGPU(Dataset):
     def __len__(self):
         return max(len(self.files_A), len(self.files_B))
 
+    @staticmethod
+    def add_poisson_noise(image, scale=1.0):
+        """
+        Apply Poisson noise to the input image.
+        :param image: input image
+        :param scale: scale factor for the input image
+        :return: noisy image
+        """
+        image = (image + 1) / 2  # 归一化到[0,1]
+
+        scaled_image = image * scale
+        noisy_image = torch.poisson(scaled_image) / scale
+        # save_image(noisy_image, 'noisy_image.png')
+
+        return noisy_image * 2 - 1  # 反归一化到(-1,1)
+
+
 class ImageDatasetGPU1(Dataset):
 
     def __init__(
@@ -161,13 +182,16 @@ class ImageDatasetGPU1(Dataset):
         transforms_=[
             transforms.Resize((256, 256), Image.BICUBIC),
             transforms.ToTensor(),
-            transforms.Normalize((0.5,), (0.5,)), 
+            transforms.Normalize((0.5,), (0.5,)),
         ],
         device="cuda",
-        max_nums=None,
+        max_nums=0,
+        max_workers=100,
     ):
         self.transform = transforms.Compose(transforms_)
-        print("数据集路径:",rootA)
+        print("数据集路径:", rootA)
+        print("数据集:", max_nums)
+
         self.files_A = sorted(glob.glob(os.path.join(rootA, "high") + "/*.png"))
         self.files_B = sorted(glob.glob(os.path.join(rootA, "low") + "/*.png"))
         self.TrueSDCTs = []
@@ -175,25 +199,27 @@ class ImageDatasetGPU1(Dataset):
         self.FakeLDCTs = []
         self.FakeULDCTs = []
 
-        if max_nums:
-            print("数据集大小:",max_nums)
+        if max_nums>0:
             indices = np.random.choice(len(self.files_A), max_nums, replace=False)
             self.files_A = [self.files_A[i] for i in indices]
             self.files_B = [self.files_B[i] for i in indices]
 
-        # Create and start threads
-        threads = []
-        for index in range(len(self.files_A)):
-            thread = threading.Thread(target=self.process_images, args=(index, device))
-            threads.append(thread)
-            thread.start()
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for index in range(len(self.files_A)):
+                executor.submit(self.process_images, index, device)
 
-        # Wait for all threads to finish
-        for thread in threads:
-            thread.join()
+        # # Create and start threads
+        # threads = []
+        # for index in range(len(self.files_A)):
+        #     thread = threading.Thread(target=self.process_images, args=(index, device))
+        #     threads.append(thread)
+        #     thread.start()
+
+        # # Wait for all threads to finish
+        # for thread in threads:
+        #     thread.join()
 
         print("dataset load to GPU successful")
-
 
     def process_images(self, index, device):
         image_A = Image.open(self.files_A[index % len(self.files_A)])
@@ -204,8 +230,8 @@ class ImageDatasetGPU1(Dataset):
 
         TrueSDCT = self.transform(image_A).to(device)
         TrueLDCT = self.transform(image_B).to(device)
-        FakeLDCT = add_poisson_noise(TrueSDCT, 70).to(device)
-        FakeULDCT = add_poisson_noise(TrueSDCT, 50).to(device)
+        FakeLDCT = add_poisson_noise(TrueSDCT, 90)
+        FakeULDCT = add_poisson_noise(TrueSDCT, 50)
 
         # Append processed images to lists
         self.TrueSDCTs.append(TrueSDCT)
@@ -223,6 +249,8 @@ class ImageDatasetGPU1(Dataset):
 
     def __len__(self):
         return max(len(self.files_A), len(self.files_B))
+
+
 if __name__ == "__main__":
     root = "/root/lmy/aapm256"
     dataset = ImageDatasetGPU(root, max_nums=100)
