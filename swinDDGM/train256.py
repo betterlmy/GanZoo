@@ -186,7 +186,7 @@ val_dataloader = DataLoader(
 
 def train():
     if use_wandb:
-        wandb.init(project="gans", name="swinDDGM" + formatted_date, config=configs)
+        wandb.init(project="gans", name="swinDDGM256" + formatted_date, config=configs)
 
     prev_time = time.time()
     for epoch in range(model_config["epoch"], train_config["n_epochs"]):
