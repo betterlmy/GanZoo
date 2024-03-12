@@ -13,11 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 # from torchvision.utils import save_image
 
 
-def to_rgb(image):
-    """Converts image to rgb if it is grayscale"""
-    rgb_image = Image.new("RGB", image.size)
-    rgb_image.paste(image)
-    return rgb_image
 
 
 def add_poisson_noise(image, scale=1.0):

@@ -1,4 +1,3 @@
-import itertools
 from datetime import datetime, timedelta
 import time
 import sys
@@ -19,7 +18,7 @@ import wandb
 
 """！！！训练时 将workdir设置为GanZoo的根目录 而非mydualgan的根目录"""
 
-config_file = "config_default.yaml"
+config_file = "config_default512.yaml"
 configs = config.update_project_dir(config_file)
 model_config = configs["model"]["mydualgan"]
 train_config = configs["train"]
@@ -27,10 +26,10 @@ use_wandb = train_config["use_wandb"]
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
 
 if use_wandb:
-    wandb.init(project="gans", name="mydualgan" + formatted_date, config=configs)
+    wandb.init(project="gans", name="mydualgan512" + formatted_date, config=configs)
 
-os.makedirs("mydualgan/outputs/%s" % model_config["dataset_name"], exist_ok=True)
-os.makedirs("mydualgan/saved_models/%s" % model_config["dataset_name"], exist_ok=True)
+os.makedirs("mydualgan/outputs/512", exist_ok=True)
+os.makedirs("mydualgan/saved_models/512", exist_ok=True)
 
 # Losses
 criterion_GAN = torch.nn.MSELoss()
@@ -40,9 +39,8 @@ criterion_pixelwise = torch.nn.L1Loss()
 lambda_pixel = 100
 
 # Calculate output of image discriminator (PatchGAN)
-patch = (1, train_config["img_size"] // 2**4, train_config["img_size"] // 2**4)
+# patch = (1, train_config["img_size"] // 2**4, train_config["img_size"] // 2**4)
 patch = (1, 16, 16)
-print("patchsize", patch)
 db_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
 db_discriminator = Discriminator(model_config["channels"])
 
@@ -63,31 +61,32 @@ if cuda:
     print("current device:" + str(device))
 
 if model_config["epoch"] != 0:
-    # Load pretrained models
-    db_generator.load_state_dict(
-        torch.load(
-            "saved_models/%s/db_generator_%d.pth"
-            % (train_config["dataset_name"], train_config["epoch"])
-        )
-    )
-    db_discriminator.load_state_dict(
-        torch.load(
-            "saved_models/%s/db_discriminator_%d.pth"
-            % (train_config["dataset_name"], train_config["epoch"])
-        )
-    )
-    b_generator.load_state_dict(
-        torch.load(
-            "saved_models/%s/b_generator_%d.pth"
-            % (train_config["dataset_name"], train_config["epoch"])
-        )
-    )
-    b_discriminator.load_state_dict(
-        torch.load(
-            "saved_models/%s/b_discriminator_%d.pth"
-            % (train_config["dataset_name"], train_config["epoch"])
-        )
-    )
+    pass
+    # # Load pretrained models
+    # db_generator.load_state_dict(
+    #     torch.load(
+    #         "saved_models/%s/db_generator_%d.pth"
+    #         % (train_config["dataset_name"], train_config["epoch"])
+    #     )
+    # )
+    # db_discriminator.load_state_dict(
+    #     torch.load(
+    #         "saved_models/%s/db_discriminator_%d.pth"
+    #         % (train_config["dataset_name"], train_config["epoch"])
+    #     )
+    # )
+    # b_generator.load_state_dict(
+    #     torch.load(
+    #         "saved_models/%s/b_generator_%d.pth"
+    #         % (train_config["dataset_name"], train_config["epoch"])
+    #     )
+    # )
+    # b_discriminator.load_state_dict(
+    #     torch.load(
+    #         "saved_models/%s/b_discriminator_%d.pth"
+    #         % (train_config["dataset_name"], train_config["epoch"])
+    #     )
+    # )
 
 else:
     # Initialize weights
@@ -119,37 +118,20 @@ optimizer_BD = torch.optim.Adam(
 )
 
 transforms_ = [
-    transforms.Resize(
-        (train_config["img_size"], train_config["img_size"]), Image.BICUBIC
-    ),
+    transforms.Resize((512, 512), Image.BICUBIC),
     transforms.ToTensor(),
     transforms.Normalize((0.5,), (0.5,)),  # 单通道
 ]
 
-max_nums =int(train_config["max_nums"])
+max_nums = 2000
 
-# aapm_data = ImageDataset(
-#     # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
-#     "/root/lmy/aapm256",
-#     transforms_=transforms_,
-#     max_nums=max_nums,
-# )
 
-if train_config["img_size"] == 256:
-    aapm_data = ImageDatasetGPU1(
-        # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
-        os.path.join(os.path.dirname(configs["project_dir"]), "aapm256"),
-        transforms_=transforms_,
-        device=device,
-        max_nums=max_nums,
-    )
-if train_config["img_size"] == 512:
-    max_nums//=4
-    aapm_data = ImageDatasetGPU1(
-        os.path.join(os.path.dirname(configs["project_dir"]), "aapm512"),
-        device=device,
-        max_nums=max_nums,
-    )
+aapm_data = ImageDatasetGPU1(
+    os.path.join(os.path.dirname(configs["project_dir"]), "aapm512"),
+    transforms_=transforms_,
+    device=device,
+    max_nums=max_nums,
+)
 
 
 train_size = int(0.9 * max_nums)
@@ -159,7 +141,7 @@ train_dataset, test_dataset = random_split(aapm_data, [train_size, test_size])
 
 dataloader = DataLoader(
     train_dataset,
-    batch_size=train_config["batch_size"],
+    batch_size=24,
     shuffle=True,
 )
 val_dataloader = DataLoader(
@@ -167,15 +149,6 @@ val_dataloader = DataLoader(
     batch_size=5,
     shuffle=False,
 )
-# val_dataloader = DataLoader(
-#     ImageDataset(
-#         "/root/lmy/aapm256",
-#         # os.path.join(configs["project_dir"], "dataset", model_config["dataset_name"]),
-#         transforms_=transforms_,
-#     ),
-#     batch_size=5,
-#     shuffle=False,
-# )
 
 
 # ----------
@@ -319,8 +292,10 @@ def train():
 
             # If at sample interval save image
             if batches_done % model_config["sample_interval"] == 0:
-                outimages, ssim_score, psnr_score ,rmse_score= sample_images(batches_done)
-                print("eval:", ssim_score, psnr_score)
+                outimages, ssim_score, psnr_score, rmse_score = sample_images(
+                    batches_done
+                )
+                print("eval:", ssim_score, psnr_score, rmse_score)
                 if use_wandb:
                     wandb.log(
                         {
@@ -347,20 +322,26 @@ def train():
             model_config["checkpoint_interval"] != -1
             and epoch % model_config["checkpoint_interval"] == 0
         ):
+            print("save model %d" % epoch)
             # Save model checkpoints
             torch.save(
                 db_generator.state_dict(),
-                "mydualgan/saved_models/%s/db_generator_%d.pth"
-                % (model_config["dataset_name"], epoch),
+                "mydualgan/saved_models/512/db_generator_%d.pth" % epoch,
             )
             torch.save(
                 db_discriminator.state_dict(),
-                "mydualgan/saved_models/%s/db_discriminator_%d.pth"
-                % (model_config["dataset_name"], epoch),
+                "mydualgan/saved_models/512/db_discriminator_%d.pth" % epoch,
+            )
+            torch.save(
+                b_generator.state_dict(),
+                "mydualgan/saved_models/512/b_generator_%d.pth" % epoch,
+            )
+            torch.save(
+                b_discriminator.state_dict(),
+                "mydualgan/saved_models/512/b_discriminator_%d.pth" % epoch,
             )
 
 
-## 待修改
 def sample_images(batches_done):
     """Saves a generated sample from the validation set"""
     train_imgs = next(iter(val_dataloader))
@@ -384,7 +365,7 @@ def sample_images(batches_done):
 
     save_image(
         train_image_grid,
-        "mydualgan/outputs/%s/%s.png" % (model_config["dataset_name"], batches_done),
+        "mydualgan/outputs/512/%s.png" % batches_done,
         nrow=5,
         normalize=True,
     )

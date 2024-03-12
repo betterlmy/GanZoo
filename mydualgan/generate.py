@@ -1,7 +1,7 @@
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
 from mydualgan.models import GeneratorUNet
-from mydualgan.datasets import ImageDataset
+from mydualgan.datasets import ImageDatasetGPU1
 from utils import config
 import torch
 import torchvision.transforms as transforms
@@ -9,38 +9,32 @@ from PIL import Image
 import os
 from evalution import ssim, psnr
 
-config_file = "config_default.yaml"
-configs = config.update_project_dir(config_file)
-model_config = configs['model']['mydualgan']
-train_config = configs['train']
-cuda = torch.cuda.is_available()
-device = torch.device("cuda:0" if cuda else "cpu")
+
+device = torch.device("cuda:6")
 input_shape = (1, 256, 256)
 
-generator = GeneratorUNet(model_config['channels'], model_config['channels'])
+generator = GeneratorUNet(1, 1).to(device)
 
-if cuda:
-    generator = generator.to(device)
-    print("current device:" + str(device))
 
 generator.load_state_dict(
-    torch.load("mydualgan/saved_models/%s/generator_%d.pth" % (model_config['dataset_name'], 1900)))
+    torch.load("mydualgan/saved_models/aapm/db_generator_1900.pth")
+)
+
 transforms_ = [
     # 数据增强
-    transforms.Resize(int(model_config['img_size'] * 1.12), Image.Resampling.BICUBIC),
-    transforms.RandomCrop((model_config['img_size'], model_config['img_size'])),
-    transforms.RandomHorizontalFlip(),
+    transforms.Resize((), Image.Resampling.BICUBIC),
     transforms.ToTensor(),
     transforms.Normalize((0.5,), (0.5,)),
 ]
 
-val_data = ImageDataset(os.path.join(configs['project_dir'], 'dataset', model_config['dataset_name']),
-                        transforms_=transforms_,
-                        unaligned=False)
+
+aapm_data = ImageDatasetGPU1("/root/lmy/aapm512", device=device, max_nums=0)
+
+
 val_dataloader = DataLoader(
-    val_data,
+    aapm_data,
     batch_size=5,
-    shuffle=True,
+    shuffle=False,
 )
 
 
@@ -59,14 +53,19 @@ def sample_images():
     ssim_score = ssim.ssim(fake_A, real_A)
     psnr_score = psnr.psnr(fake_A, real_A)
 
-    save_image(image_grid, "pix2pix/outputs/%s/eval/out.png" % (model_config['dataset_name']), normalize=False)
+    save_image(
+        image_grid,
+        "pix2pix/outputs/%s/eval/out.png" % (model_config["dataset_name"]),
+        normalize=False,
+    )
     print("save image success, ssim: %f, psnr: %f" % (ssim_score, psnr_score))
     return image_grid, ssim_score, psnr_score
 
 
 def gene():
-    sample_images()
+    # sample_images()
+    generator.eval()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     gene()
