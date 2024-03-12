@@ -13,8 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 # from torchvision.utils import save_image
 
 
-
-
 def add_poisson_noise(image, scale=1.0):
     """
     Apply Poisson noise to the input image.
@@ -194,7 +192,7 @@ class ImageDatasetGPU1(Dataset):
         self.FakeLDCTs = []
         self.FakeULDCTs = []
 
-        if max_nums>0:
+        if max_nums > 0:
             indices = np.random.choice(len(self.files_A), max_nums, replace=False)
             self.files_A = [self.files_A[i] for i in indices]
             self.files_B = [self.files_B[i] for i in indices]
@@ -244,6 +242,24 @@ class ImageDatasetGPU1(Dataset):
 
     def __len__(self):
         return max(len(self.files_A), len(self.files_B))
+
+
+class GeneDataset(Dataset):
+    def __init__(
+        self,
+        root,
+        transforms_,
+    ):
+        self.transforms_ = transforms.Compose(transforms_)
+        self.files_A = sorted(glob.glob(os.path.join(root) + "/*.png"))
+
+    def __getitem__(self, index):
+        image_A = Image.open(self.files_A[index % len(self.files_A)])
+        image_A = self.transforms_(image_A)
+        return image_A
+
+    def __len__(self):
+        return len(self.files_A)
 
 
 if __name__ == "__main__":
