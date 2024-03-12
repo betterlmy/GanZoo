@@ -145,7 +145,7 @@ dataloader = DataLoader(
 val_dataloader = DataLoader(
     test_dataset,
     batch_size=5,
-    shuffle=False,
+    shuffle=True,
 )
 
 
