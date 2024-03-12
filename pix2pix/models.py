@@ -129,5 +129,64 @@ class Discriminator(nn.Module):
 
     def forward(self, img_A, img_B):
         # Concatenate image and condition image by channels to produce input
+        img_input = torch.cat((img_A-img_B, img_B), 1)
+        for layer in self.model:
+            print(img_input.shape)
+            img_input = layer(img_input)
+        return img_input
+        # return self.model(img_input)
+
+
+class DualPathDiscriminator(nn.Module):
+    def __init__(self, in_channels=3):
+        super(DualPathDiscriminator, self).__init__()
+
+        def discriminator_block(in_filters, out_filters, normalization=True):
+            """Returns downsampling layers of each discriminator block"""
+            layers = [nn.Conv2d(in_filters, out_filters, 4, stride=2, padding=1)]
+            if normalization:
+                layers.append(nn.InstanceNorm2d(out_filters))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            return layers
+
+        # Local path for patch-based discrimination
+        self.local_path = nn.Sequential(
+            *discriminator_block(in_channels * 2, 64, normalization=False),
+            *discriminator_block(64, 128),
+            *discriminator_block(128, 256),
+            *discriminator_block(256, 512)
+        )
+
+        # Additional layers for the global path
+        self.global_path = nn.Sequential(
+            nn.ZeroPad2d((1, 0, 1, 0)),  # Padding to match the local path's output size
+            nn.Conv2d(512, 512, 4, padding=1, bias=False),
+            nn.InstanceNorm2d(512),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(512, 512, 4, padding=1, bias=False),  # Additional downsampling
+            nn.Flatten(),  # Flatten the feature map to a vector
+            nn.Linear(512 * 4 * 4, 1)  # Fully connected layer for global discrimination
+        )
+
+        # Final convolution for the local path (patch-based output)
+        self.final_conv_local = nn.Conv2d(512, 1, 4, padding=1, bias=False)
+
+    def forward(self, img_A, img_B):
+        # Concatenate image and condition image by channels to produce input
         img_input = torch.cat((img_A, img_B), 1)
-        return self.model(img_input)
+        local_features = self.local_path(img_input)
+        global_features = self.global_path(local_features)
+        local_output = self.final_conv_local(local_features)
+
+        # We can use a sigmoid at the end if we want to interpret the output as probabilities
+        # local_output = torch.sigmoid(local_output)
+        # global_output = torch.sigmoid(global_output)
+
+        return local_output, global_features.view(-1)  # Reshape global output to (batch_size,)
+
+if __name__ == "__main__":
+
+
+    D = Discriminator(in_channels=1)
+    img_A = torch.randn(1,1, 256, 256)
+    D(img_A, img_A)
