@@ -26,7 +26,7 @@ use_wandb = train_config["use_wandb"]
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
 
 if use_wandb:
-    wandb.init(project="gans", name="mydualgan256" + formatted_date, config=configs)
+    wandb.init(project="gans", name="mydualgan-256-" + formatted_date, config=configs)
 
 os.makedirs("mydualgan/outputs/256", exist_ok=True)
 os.makedirs("mydualgan/saved_models/256", exist_ok=True)
@@ -137,7 +137,7 @@ aapm_data = ImageDatasetGPU1(
 train_size = int(0.9 * max_nums)
 test_size = max_nums - train_size
 
-train_dataset, test_dataset = random_split(aapm_data, [train_size, test_size])
+train_dataset, val_dataset = random_split(aapm_data, [train_size, test_size])
 
 dataloader = DataLoader(
     train_dataset,
@@ -145,9 +145,9 @@ dataloader = DataLoader(
     shuffle=True,
 )
 val_dataloader = DataLoader(
-    test_dataset,
+    val_dataset,
     batch_size=5,
-    shuffle=False,
+    shuffle=True,
 )
 
 
