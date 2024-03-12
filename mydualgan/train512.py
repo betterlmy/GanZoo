@@ -18,15 +18,13 @@ import wandb
 
 """！！！训练时 将workdir设置为GanZoo的根目录 而非mydualgan的根目录"""
 
-config_file = "config_default512.yaml"
+config_file = "config_mydualgan_512.yaml"
 configs = config.update_project_dir(config_file)
 model_config = configs["model"]["mydualgan"]
 train_config = configs["train"]
 use_wandb = train_config["use_wandb"]
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
 
-if use_wandb:
-    wandb.init(project="gans", name="mydualgan512" + formatted_date, config=configs)
 
 os.makedirs("mydualgan/outputs/512", exist_ok=True)
 os.makedirs("mydualgan/saved_models/512", exist_ok=True)
@@ -40,7 +38,7 @@ lambda_pixel = 100
 
 # Calculate output of image discriminator (PatchGAN)
 # patch = (1, train_config["img_size"] // 2**4, train_config["img_size"] // 2**4)
-patch = (1, 16, 16)
+patch = (1, 32, 32)
 db_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
 db_discriminator = Discriminator(model_config["channels"])
 
@@ -123,7 +121,7 @@ transforms_ = [
     transforms.Normalize((0.5,), (0.5,)),  # 单通道
 ]
 
-max_nums = 2000
+max_nums = train_config["max_nums"]
 
 
 aapm_data = ImageDatasetGPU1(
@@ -158,6 +156,10 @@ val_dataloader = DataLoader(
 
 def train():
     prev_time = time.time()
+    if use_wandb:
+        wandb.init(
+            project="gans", name="mydualgan-512-" + formatted_date, config=configs
+        )
     for epoch in range(model_config["epoch"], train_config["n_epochs"]):
         for i, batch in enumerate(dataloader):
             trueSDCT = batch["TrueSDCT"].to(device)  # 真实的SDCT
@@ -181,6 +183,7 @@ def train():
             optimizer_BG.zero_grad()
             g_LDCT = b_generator(fakeLDCT)  # 给出加噪得到的LDCT图像 用来模拟真实的LDCT
             pred_fake1 = b_discriminator(g_LDCT, fakeLDCT)
+            print(pred_fake1.shape)
             loss_GAN1 = criterion_GAN(pred_fake1, valid)
 
             # Pixel-wise loss
