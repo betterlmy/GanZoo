@@ -24,7 +24,7 @@ model_config = configs["model"]["mydualgan"]
 train_config = configs["train"]
 use_wandb = train_config["use_wandb"]
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
-
+batch_size = train_config["batch_size"]
 
 os.makedirs("mydualgan/outputs/512", exist_ok=True)
 os.makedirs("mydualgan/saved_models/512", exist_ok=True)
@@ -139,7 +139,7 @@ train_dataset, test_dataset = random_split(aapm_data, [train_size, test_size])
 
 dataloader = DataLoader(
     train_dataset,
-    batch_size=24,
+    batch_size=batch_size,
     shuffle=True,
 )
 val_dataloader = DataLoader(

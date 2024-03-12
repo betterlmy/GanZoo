@@ -3,7 +3,6 @@ model:
   mydualgan:
     b1: 0.5
     b2: 0.999
-    batch_size: 64
     channels: 1
     checkpoint_interval: 100
     dataset_name: aapm
@@ -14,15 +13,14 @@ model:
     lambda_id: 2.0
     latent_dim: 100
     lr: 0.0002
-    n_cpu: 16
     n_residual_blocks: 9
     sample_interval: 100
 project_dir: /root/lmy/GanZoo
 train:
-  batch_size: 24
+  batch_size: 16
   gpu_id: '2'
   img_size: 512
-  max_nums: 2000
+  max_nums: 1500
   model_save_interval: 400
   n_epochs: 200000
   print_interval: 50
