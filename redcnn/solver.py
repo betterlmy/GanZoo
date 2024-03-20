@@ -113,7 +113,9 @@ class Solver(object):
         train_losses = []
         total_iters = 0
         start_time = time.time()
+        print(self.device)
         for epoch in range(1, self.num_epochs):
+            
             self.REDCNN.train(True)
 
             for iter_, (x, y) in enumerate(self.data_loader):
