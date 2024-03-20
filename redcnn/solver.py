@@ -25,11 +25,15 @@ class Solver(object):
             self.device = torch.device(args.device)
         else:
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            self.device = torch.device('mps' if torch.backends.mps.is_built() else 'cpu')
+            # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.norm_range_min = args.norm_range_min
         self.norm_range_max = args.norm_range_max
         self.trunc_min = args.trunc_min
         self.trunc_max = args.trunc_max
+        # self.trunc_min = args.norm_range_min
+        # self.trunc_max = args.norm_range_max
 
         self.save_path = args.save_path
         self.multi_gpu = args.multi_gpu
@@ -68,7 +72,7 @@ class Solver(object):
                 state_d[n] = v
             self.REDCNN.load_state_dict(state_d)
         else:
-            self.REDCNN.load_state_dict(torch.load(f))
+            self.REDCNN.load_state_dict(torch.load(f,map_location=self.device))
 
 
     def lr_decay(self):
@@ -113,9 +117,7 @@ class Solver(object):
         train_losses = []
         total_iters = 0
         start_time = time.time()
-        print(self.device)
         for epoch in range(1, self.num_epochs):
-            
             self.REDCNN.train(True)
 
             for iter_, (x, y) in enumerate(self.data_loader):

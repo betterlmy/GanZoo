@@ -11,6 +11,9 @@ def save_dataset(args):
 
     patients_list = sorted([d for d in os.listdir(args.data_path) if 'zip' not in d])
     for p_ind, patient in enumerate(patients_list):
+        if patient == '.DS_Store':
+            continue
+        # "/Users/zane/Library/Mobile Documents/com~apple~CloudDocs/CodeProject/dataset/ctlowdose/CT_low_dose_reconstruction_dataset/Original Data/Full Dose/1mm Slice Thickness/Sharp Kernel (D45)/L067/L067_FD_1_SHARP_1.CT.0002.0001.2016.01.21.18.11.40.977560.404629015.IMA"
         patient_input_path = os.path.join(args.data_path, patient,
                                           "quarter_{}mm".format(args.mm))
         patient_target_path = os.path.join(args.data_path, patient,
@@ -32,7 +35,8 @@ def save_dataset(args):
 
 def load_scan(path):
     # referred from https://www.kaggle.com/gzuidhof/full-preprocessing-tutorial
-    slices = [pydicom.read_file(os.path.join(path, s)) for s in os.listdir(path)]
+    slices = [pydicom.read_file(os.path.join(path, s)) for s in os.listdir(path) if '.IMA' in s]
+
     slices.sort(key=lambda x: float(x.ImagePositionPatient[2]))
     try:
         slice_thickness = np.abs(slices[0].ImagePositionPatient[2] - slices[1].ImagePositionPatient[2])
@@ -57,10 +61,10 @@ def get_pixels_hu(slices):
         image[slice_number] += np.int16(intercept)
     return np.array(image, dtype=np.int16)
 
-
 def normalize_(image, MIN_B=-1024.0, MAX_B=3072.0):
-   image = (image - MIN_B) / (MAX_B - MIN_B)
-   return image
+
+    image = (image - MIN_B) / (MAX_B - MIN_B)
+    return image
 
 
 def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=100, fill=' '):
@@ -76,13 +80,13 @@ def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--data_path', type=str, default='./AAPM-Mayo-CT-Challenge/')
+    parser.add_argument('--data_path', type=str, default='/Users/zane/Desktop/mayo')
     parser.add_argument('--save_path', type=str, default='./npy_img/')
 
     parser.add_argument('--test_patient', type=str, default='L506')
     parser.add_argument('--mm', type=int, default=3)
     parser.add_argument('--norm_range_min', type=float, default=-1024.0)
-    parser.add_argument('--norm_range_max', type=float, default=3072.0)
+    parser.add_argument('--norm_range_max', type=float, default=3000.0)
 
     args = parser.parse_args()
     save_dataset(args)
