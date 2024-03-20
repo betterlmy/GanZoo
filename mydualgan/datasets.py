@@ -9,6 +9,7 @@ from PIL import Image
 import torchvision.transforms as transforms
 import time
 from concurrent.futures import ThreadPoolExecutor
+import re
 
 # from torchvision.utils import save_image
 
@@ -251,7 +252,21 @@ class GeneDataset(Dataset):
         transforms_,
     ):
         self.transforms_ = transforms.Compose(transforms_)
-        self.files_A = sorted(glob.glob(os.path.join(root) + "/*.png"))
+        files = glob.glob(os.path.join(root) + "/*.png")
+
+        # 输出files_A 查看顺序
+        def extract_number(file_path):
+            basename = os.path.basename(file_path)  # 获取文件名
+            number = re.search(r"\d+", basename)  # 使用正则表达式查找数字
+            if number:
+                return int(number.group())  # 返回数字部分转换成的整数
+            return 0  # 如果没有找到数字，返回0
+
+        self.files_A = sorted(files, key=extract_number)
+
+        # for files in self.files_A:
+        #     print(files)
+        #     time.sleep(0.02)
 
     def __getitem__(self, index):
         image_A = Image.open(self.files_A[index % len(self.files_A)])
@@ -262,7 +277,7 @@ class GeneDataset(Dataset):
         return len(self.files_A)
 
 
-if __name__ == "__main__":
-    root = "/root/lmy/aapm256"
-    dataset = ImageDatasetGPU(root, max_nums=100)
-    print(len(dataset))
+# if __name__ == "__main__":
+#     root = "/root/lmy/aapm256"
+#     dataset = ImageDatasetGPU(root, max_nums=100)
+#     print(len(dataset))

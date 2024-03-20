@@ -59,6 +59,14 @@ if cuda:
     criterion_GAN.to(device)
     criterion_pixelwise.to(device)
     print("current device:" + str(device))
+    param1 = sum(p.numel() for p in db_generator.parameters())
+    param2 = sum(p.numel() for p in db_discriminator.parameters())
+    print(
+        "总参数量:%.2fM"
+        % ((param1 + param2) * 2 / 1e6)
+    )
+    time.sleep(100000)
+
 
 if model_config["epoch"] != 0:
     pass
