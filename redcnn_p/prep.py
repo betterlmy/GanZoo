@@ -13,7 +13,6 @@ def save_dataset(args):
     for p_ind, patient in enumerate(patients_list):
         if patient == '.DS_Store':
             continue
-        # "/Users/zane/Library/Mobile Documents/com~apple~CloudDocs/CodeProject/dataset/ctlowdose/CT_low_dose_reconstruction_dataset/Original Data/Full Dose/1mm Slice Thickness/Sharp Kernel (D45)/L067/L067_FD_1_SHARP_1.CT.0002.0001.2016.01.21.18.11.40.977560.404629015.IMA"
         patient_input_path = os.path.join(args.data_path, patient,
                                           "quarter_{}mm".format(args.mm))
         patient_target_path = os.path.join(args.data_path, patient,

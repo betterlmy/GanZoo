@@ -6,8 +6,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
-from pix2pix.datasets import ImageDataset
-from pix2pix.models import GeneratorUNet, Discriminator, weights_init_normal
+from pix2pix_p.datasets import ImageDataset
+from pix2pix_p.models import GeneratorUNet, Discriminator, weights_init_normal
 from evalution import ssim, psnr
 from utils import config
 import torch

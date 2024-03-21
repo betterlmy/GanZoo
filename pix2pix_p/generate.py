@@ -1,7 +1,7 @@
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
-from pix2pix.models import GeneratorUNet
-from pix2pix.datasets import ImageDataset
+from pix2pix_p.models import GeneratorUNet
+from pix2pix_p.datasets import ImageDataset
 from utils import config
 import torch
 import torchvision.transforms as transforms
