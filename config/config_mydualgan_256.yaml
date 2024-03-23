@@ -16,14 +16,14 @@ model:
     lr: 0.0002
     n_cpu: 16
     n_residual_blocks: 9
-    sample_interval: 100
+    sample_interval: 10000
 project_dir: /root/lmy/GanZoo
 train:
   batch_size: 24
   gpu_id: '7'
   img_size: 256
   max_nums: 4000
-  model_save_interval: 400
+  model_save_interval: 40000
   n_epochs: 200000
-  print_interval: 50
+  print_interval: 5000
   use_wandb: false

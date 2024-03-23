@@ -24,9 +24,7 @@ model_config = configs["model"]["mydualgan"]
 train_config = configs["train"]
 use_wandb = train_config["use_wandb"]
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
-
-if use_wandb:
-    wandb.init(project="gans", name="mydualgan-256-" + formatted_date, config=configs)
+batch_size = train_config["batch_size"]
 
 os.makedirs("mydualgan/outputs/256", exist_ok=True)
 os.makedirs("mydualgan/saved_models/256", exist_ok=True)
@@ -59,14 +57,6 @@ if cuda:
     criterion_GAN.to(device)
     criterion_pixelwise.to(device)
     print("current device:" + str(device))
-    param1 = sum(p.numel() for p in db_generator.parameters())
-    param2 = sum(p.numel() for p in db_discriminator.parameters())
-    print(
-        "总参数量:%.2fM"
-        % ((param1 + param2) * 2 / 1e6)
-    )
-    time.sleep(100000)
-
 
 if model_config["epoch"] != 0:
     pass
@@ -131,7 +121,7 @@ transforms_ = [
     transforms.Normalize((0.5,), (0.5,)),  # 单通道
 ]
 
-max_nums = 10000
+max_nums = train_config["max_nums"]
 
 
 aapm_data = ImageDatasetGPU1(
@@ -145,15 +135,15 @@ aapm_data = ImageDatasetGPU1(
 train_size = int(0.9 * max_nums)
 test_size = max_nums - train_size
 
-train_dataset, val_dataset = random_split(aapm_data, [train_size, test_size])
+train_dataset, test_dataset = random_split(aapm_data, [train_size, test_size])
 
 dataloader = DataLoader(
     train_dataset,
-    batch_size=64,
+    batch_size=batch_size,
     shuffle=True,
 )
 val_dataloader = DataLoader(
-    val_dataset,
+    test_dataset,
     batch_size=5,
     shuffle=True,
 )
@@ -166,6 +156,10 @@ val_dataloader = DataLoader(
 
 def train():
     prev_time = time.time()
+    if use_wandb:
+        wandb.init(
+            project="gans", name="mydualgan-256-" + formatted_date, config=configs
+        )
     for epoch in range(model_config["epoch"], train_config["n_epochs"]):
         for i, batch in enumerate(dataloader):
             trueSDCT = batch["TrueSDCT"].to(device)  # 真实的SDCT
@@ -189,6 +183,7 @@ def train():
             optimizer_BG.zero_grad()
             g_LDCT = b_generator(fakeLDCT)  # 给出加噪得到的LDCT图像 用来模拟真实的LDCT
             pred_fake1 = b_discriminator(g_LDCT, fakeLDCT)
+            print(pred_fake1.shape)
             loss_GAN1 = criterion_GAN(pred_fake1, valid)
 
             # Pixel-wise loss
@@ -279,31 +274,31 @@ def train():
             )  # 计算剩余时间
             prev_time = time.time()
             # Print log
-            sys.stdout.write(
-                "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
-                % (
-                    epoch,
-                    train_config["n_epochs"],
-                    i,
-                    len(dataloader),
-                    ssim.ssim(g_SDCT, trueSDCT),
-                    psnr.psnr(g_SDCT, trueSDCT),
-                    loss_BD.item(),
-                    loss_BG.item(),
-                    loss_B_pixel.item(),
-                    loss_DBD.item(),
-                    loss_DBG.item(),
-                    loss_DB_pixel.item(),
-                    time_left,
-                )
-            )
+            # sys.stdout.write(
+            #     "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
+            #     % (
+            #         epoch,
+            #         train_config["n_epochs"],
+            #         i,
+            #         len(dataloader),
+            #         ssim.ssim(g_SDCT, trueSDCT),
+            #         psnr.psnr(g_SDCT, trueSDCT),
+            #         loss_BD.item(),
+            #         loss_BG.item(),
+            #         loss_B_pixel.item(),
+            #         loss_DBD.item(),
+            #         loss_DBG.item(),
+            #         loss_DB_pixel.item(),
+            #         time_left,
+            #     )
+            # )
 
             # If at sample interval save image
             if batches_done % model_config["sample_interval"] == 0:
                 outimages, ssim_score, psnr_score, rmse_score = sample_images(
                     batches_done
                 )
-                print("eval:", ssim_score, psnr_score)
+                print("eval:", ssim_score, psnr_score, rmse_score)
                 if use_wandb:
                     wandb.log(
                         {

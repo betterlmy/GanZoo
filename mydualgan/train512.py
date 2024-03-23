@@ -274,24 +274,24 @@ def train():
             )  # 计算剩余时间
             prev_time = time.time()
             # Print log
-            sys.stdout.write(
-                "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
-                % (
-                    epoch,
-                    train_config["n_epochs"],
-                    i,
-                    len(dataloader),
-                    ssim.ssim(g_SDCT, trueSDCT),
-                    psnr.psnr(g_SDCT, trueSDCT),
-                    loss_BD.item(),
-                    loss_BG.item(),
-                    loss_B_pixel.item(),
-                    loss_DBD.item(),
-                    loss_DBG.item(),
-                    loss_DB_pixel.item(),
-                    time_left,
-                )
-            )
+            # sys.stdout.write(
+            #     "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
+            #     % (
+            #         epoch,
+            #         train_config["n_epochs"],
+            #         i,
+            #         len(dataloader),
+            #         ssim.ssim(g_SDCT, trueSDCT),
+            #         psnr.psnr(g_SDCT, trueSDCT),
+            #         loss_BD.item(),
+            #         loss_BG.item(),
+            #         loss_B_pixel.item(),
+            #         loss_DBD.item(),
+            #         loss_DBG.item(),
+            #         loss_DB_pixel.item(),
+            #         time_left,
+            #     )
+            # )
 
             # If at sample interval save image
             if batches_done % model_config["sample_interval"] == 0:
