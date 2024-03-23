@@ -13,6 +13,7 @@ class CTPatchDataset(tordata.Dataset):
         # normalize to [0, 1]
         data = (torch.clamp(data, hu_min, hu_max) - hu_min) / (hu_max - hu_min)
         self.low_doses, self.full_doses = data[0], data[1]
+        
 
     def __getitem__(self, index):
         low_dose, full_dose = self.low_doses[index], self.full_doses[index]

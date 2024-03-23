@@ -1,7 +1,6 @@
 import torch
 import torch.nn.functional as F
-from kornia.filters import get_gaussian_kernel2d, filter2D
-
+from kornia.filters import get_gaussian_kernel2d,filter2d
 
 def compute_ssim(img1, img2, window_size=11, reduction: str = "mean", max_val: float = 1.0, full: bool = False):
     window: torch.Tensor = get_gaussian_kernel2d(
@@ -12,8 +11,8 @@ def compute_ssim(img1, img2, window_size=11, reduction: str = "mean", max_val: f
     tmp_kernel: torch.Tensor = window.to(img1)
     tmp_kernel = torch.unsqueeze(tmp_kernel, dim=0)
     # compute local mean per channel
-    mu1: torch.Tensor = filter2D(img1, tmp_kernel)
-    mu2: torch.Tensor = filter2D(img2, tmp_kernel)
+    mu1: torch.Tensor = filter2d(img1, tmp_kernel)
+    mu2: torch.Tensor = filter2d(img2, tmp_kernel)
     mu1_sq = mu1.pow(2)
     mu2_sq = mu2.pow(2)
     mu1_mu2 = mu1 * mu2
