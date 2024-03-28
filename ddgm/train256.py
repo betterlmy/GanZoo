@@ -17,7 +17,6 @@ import torchvision.transforms as transforms
 import wandb
 
 """！！！训练时 将workdir设置为GanZoo的根目录 而非ddgm的根目录"""
-
 config_file = "config_ddgm_256.yaml"
 configs = config.update_project_dir(config_file)
 model_config = configs["model"]["ddgm"]
@@ -29,10 +28,19 @@ batch_size = train_config["batch_size"]
 os.makedirs("ddgm/outputs/256", exist_ok=True)
 os.makedirs("ddgm/saved_models/256", exist_ok=True)
 
+
+def tv_loss(img):
+    # 计算图像在水平方向上的变化
+    w_var = torch.abs(img[:, :, :, :-1] - img[:, :, :, 1:])
+    # 计算图像在垂直方向上的变化
+    h_var = torch.abs(img[:, :, :-1, :] - img[:, :, 1:, :])
+    # 将变化量的和作为总变异
+    return torch.sum(w_var) + torch.sum(h_var)
+
+
 # Losses
 criterion_GAN = torch.nn.MSELoss()
 criterion_pixelwise = torch.nn.L1Loss()
-
 # Loss weight of L1 pixel-wise loss between translated image and real image
 lambda_pixel = 100
 
@@ -46,9 +54,9 @@ b_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
 b_discriminator = Discriminator(model_config["channels"])
 
 cuda = torch.cuda.is_available()
-device = torch.device("cuda:" + train_config["gpu_id"] if cuda else "cpu")
-
-if cuda:
+# device = torch.device("cuda:" + train_config["gpu_id"] if cuda else "cpu")
+device = torch.device("mps")
+if device.type != "cpu":
     db_generator = db_generator.to(device)
     db_discriminator = db_discriminator.to(device)
 
@@ -101,19 +109,19 @@ aapm_data = ImageDatasetGPU1(
     max_nums=max_nums,
 )
 
-train_size = int(0.9 * max_nums)
-test_size = max_nums - train_size
+train_size = int(0.9 * len(aapm_data))
+test_size = len(aapm_data) - train_size
 
 train_dataset, test_dataset = random_split(aapm_data, [train_size, test_size])
 
 dataloader = DataLoader(
     train_dataset,
-    batch_size=batch_size,
+    batch_size=4,
     shuffle=True,
 )
 val_dataloader = DataLoader(
     test_dataset,
-    batch_size=5,
+    batch_size=1,
     shuffle=True,
 )
 
@@ -152,12 +160,12 @@ def train():
             optimizer_BG.zero_grad()
             g_LDCT = b_generator(fakeLDCT)  # 给出加噪得到的LDCT图像 用来模拟真实的LDCT
             pred_fake1 = b_discriminator(g_LDCT, fakeLDCT)
-            print(pred_fake1.shape)
             loss_GAN1 = criterion_GAN(pred_fake1, valid)
 
             # Pixel-wise loss
             loss_B_pixel = criterion_pixelwise(g_LDCT, trueLDCT)
-
+            loss_tv1 = tv_loss(g_LDCT)
+            print("ganloss:", loss_GAN1.item(), "pixelloss:", loss_B_pixel.item(), "tvloss:", loss_tv1.item())
             # Total loss
             loss_BG = loss_GAN1 + lambda_pixel * loss_B_pixel
 
@@ -243,24 +251,24 @@ def train():
             )  # 计算剩余时间
             prev_time = time.time()
             # Print log
-            # sys.stdout.write(
-            #     "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
-            #     % (
-            #         epoch,
-            #         train_config["n_epochs"],
-            #         i,
-            #         len(dataloader),
-            #         ssim.ssim(g_SDCT, trueSDCT),
-            #         psnr.psnr(g_SDCT, trueSDCT),
-            #         loss_BD.item(),
-            #         loss_BG.item(),
-            #         loss_B_pixel.item(),
-            #         loss_DBD.item(),
-            #         loss_DBG.item(),
-            #         loss_DB_pixel.item(),
-            #         time_left,
-            #     )
-            # )
+            sys.stdout.write(
+                "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
+                % (
+                    epoch,
+                    train_config["n_epochs"],
+                    i,
+                    len(dataloader),
+                    ssim.ssim(g_SDCT, trueSDCT),
+                    psnr.psnr(g_SDCT, trueSDCT),
+                    loss_BD.item(),
+                    loss_BG.item(),
+                    loss_B_pixel.item(),
+                    loss_DBD.item(),
+                    loss_DBG.item(),
+                    loss_DB_pixel.item(),
+                    time_left,
+                )
+            )
 
             # If at sample interval save image
             if batches_done % model_config["sample_interval"] == 0:

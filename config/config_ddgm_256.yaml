@@ -1,6 +1,6 @@
 dataset_relative_path: dataset/B301MM/high
 model:
-  mydualgan:
+  ddgm:
     b1: 0.5
     b2: 0.999
     batch_size: 64
@@ -17,7 +17,7 @@ model:
     n_cpu: 16
     n_residual_blocks: 9
     sample_interval: 10000
-project_dir: /root/lmy/GanZoo
+project_dir: /Users/zane/PycharmProjects/GanZoo
 train:
   batch_size: 24
   gpu_id: '7'

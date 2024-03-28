@@ -11,6 +11,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import re
 
+
 # from torchvision.utils import save_image
 
 
@@ -34,16 +35,16 @@ class ImageDataset(Dataset):
     """p2p要求成对的数据集"""
 
     def __init__(
-        self,
-        rootA,
-        transforms_=[
-            transforms.Resize((256, 256), Image.BICUBIC),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5,), (0.5,)),  # 单通道
-        ],
-        unaligned=False,
-        rgb=False,
-        max_nums=None,
+            self,
+            rootA,
+            transforms_=[
+                transforms.Resize((256, 256), Image.BICUBIC),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),  # 单通道
+            ],
+            unaligned=False,
+            rgb=False,
+            max_nums=None,
     ):
         self.transform = transforms.Compose(transforms_)
         self.unaligned = unaligned
@@ -97,17 +98,18 @@ class ImageDatasetGPU(Dataset):
     """p2p要求成对的数据集"""
 
     def __init__(
-        self,
-        rootA,
-        transforms_=[
-            transforms.Resize((256, 256), Image.BICUBIC),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5,), (0.5,)),  # 单通道
-        ],
-        device="cuda",
-        max_nums=None,
-        max_workers=100,
+            self,
+            rootA,
+            transforms_=None,
+            device="cuda",
+            max_nums=None,
     ):
+        if transforms_ is None:
+            transforms_ = [
+                transforms.Resize((256, 256), Image.BICUBIC),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),  # 单通道
+            ]
         self.transform = transforms.Compose(transforms_)
 
         self.files_A = sorted(glob.glob(os.path.join(rootA, "high") + "/*.png"))
@@ -171,20 +173,20 @@ class ImageDatasetGPU(Dataset):
 class ImageDatasetGPU1(Dataset):
 
     def __init__(
-        self,
-        rootA,
-        transforms_=[
-            transforms.Resize((256, 256), Image.BICUBIC),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5,), (0.5,)),
-        ],
-        device="cuda",
-        max_nums=0,
-        max_workers=100,
+            self,
+            rootA,
+            transforms_=None,
+            device="cuda",
+            max_nums=0,
+            max_workers=100,
     ):
+        if transforms_ is None:
+            transforms_ = [
+                transforms.Resize((256, 256), Image.BICUBIC),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),
+            ]
         self.transform = transforms.Compose(transforms_)
-        print("数据集路径:", rootA)
-        print("数据集:", max_nums)
 
         self.files_A = sorted(glob.glob(os.path.join(rootA, "high") + "/*.png"))
         self.files_B = sorted(glob.glob(os.path.join(rootA, "low") + "/*.png"))
@@ -192,27 +194,19 @@ class ImageDatasetGPU1(Dataset):
         self.TrueLDCTs = []
         self.FakeLDCTs = []
         self.FakeULDCTs = []
-
-        if max_nums > 0:
-            indices = np.random.choice(len(self.files_A), max_nums, replace=False)
+        max_nums = len(self.files_A) if max_nums == 0 or max_nums > len(self.files_A) else max_nums
+        self.max_nums = max_nums
+        print("数据集路径:", rootA)
+        print("数据集:", self.max_nums)
+        if self.max_nums > 0:
+            indices = np.sort(np.random.choice(len(self.files_A), self.max_nums, replace=False))
             self.files_A = [self.files_A[i] for i in indices]
             self.files_B = [self.files_B[i] for i in indices]
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             for index in range(len(self.files_A)):
                 executor.submit(self.process_images, index, device)
-
-        # # Create and start threads
-        # threads = []
-        # for index in range(len(self.files_A)):
-        #     thread = threading.Thread(target=self.process_images, args=(index, device))
-        #     threads.append(thread)
-        #     thread.start()
-
-        # # Wait for all threads to finish
-        # for thread in threads:
-        #     thread.join()
-
+        time.sleep(1)
         print("dataset load to GPU successful")
 
     def process_images(self, index, device):
@@ -227,13 +221,13 @@ class ImageDatasetGPU1(Dataset):
         FakeLDCT = add_poisson_noise(TrueSDCT, 90)
         FakeULDCT = add_poisson_noise(TrueSDCT, 50)
 
-        # Append processed images to lists
         self.TrueSDCTs.append(TrueSDCT)
         self.TrueLDCTs.append(TrueLDCT)
         self.FakeLDCTs.append(FakeLDCT)
         self.FakeULDCTs.append(FakeULDCT)
 
     def __getitem__(self, index):
+        print("index:", index)
         return {
             "TrueSDCT": self.TrueSDCTs[index],
             "TrueLDCT": self.TrueLDCTs[index],
@@ -242,14 +236,14 @@ class ImageDatasetGPU1(Dataset):
         }
 
     def __len__(self):
-        return max(len(self.files_A), len(self.files_B))
+        return self.max_nums
 
 
 class GeneDataset(Dataset):
     def __init__(
-        self,
-        root,
-        transforms_,
+            self,
+            root,
+            transforms_,
     ):
         self.transforms_ = transforms.Compose(transforms_)
         files = glob.glob(os.path.join(root) + "/*.png")
@@ -275,7 +269,6 @@ class GeneDataset(Dataset):
 
     def __len__(self):
         return len(self.files_A)
-
 
 # if __name__ == "__main__":
 #     root = "/root/lmy/aapm256"
