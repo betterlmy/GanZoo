@@ -1,0 +1,27 @@
+dataset_relative_path: dataset/B301MM/high
+model:
+  mydualgan:
+    b1: 0.5
+    b2: 0.999
+    channels: 1
+    checkpoint_interval: 100
+    dataset_name: aapm
+    decay_epoch: 100
+    epoch: 0
+    img_size: 512
+    lambda_cyc: 3.0
+    lambda_id: 2.0
+    latent_dim: 100
+    lr: 0.0002
+    n_residual_blocks: 9
+    sample_interval: 10000
+project_dir: /root/lmy/GanZoo
+train:
+  batch_size: 16
+  gpu_id: '6'
+  img_size: 512
+  max_nums: 1500
+  model_save_interval: 40000
+  n_epochs: 200000
+  print_interval: 5000
+  use_wandb: false
