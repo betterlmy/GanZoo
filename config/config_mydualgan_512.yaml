@@ -18,7 +18,7 @@ model:
 project_dir: /root/lmy/GanZoo
 train:
   batch_size: 16
-  gpu_id: '6'
+  gpu_id: '3'
   img_size: 512
   max_nums: 1500
   model_save_interval: 40000

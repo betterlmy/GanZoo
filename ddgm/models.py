@@ -124,10 +124,78 @@ class Discriminator(nn.Module):
             *discriminator_block(128, 256),
             *discriminator_block(256, 512),
             nn.ZeroPad2d((1, 0, 1, 0)),
-            nn.Conv2d(512, 1, 4, padding=1, bias=False)
+            nn.Conv2d(512, 1, 4, padding=1, bias=False),
         )
 
     def forward(self, img_A, img_B):
         # Concatenate image and condition image by channels to produce input
         img_input = torch.cat((img_A, img_B), 1)
         return self.model(img_input)
+
+
+class DPSB(nn.Module):
+    def __init__(self, in_channels=3):
+        super(DPSB, self).__init__()
+
+        def discriminator_block(in_filters, out_filters, normalization=True):
+            """Returns downsampling layers of each discriminator block"""
+            layers = [nn.Conv2d(in_filters, out_filters, 4, stride=2, padding=1)]
+            if normalization:
+                layers.append(nn.InstanceNorm2d(out_filters))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            return layers
+
+        self.localScore = nn.Sequential(
+            *discriminator_block(in_channels * 2, 64, normalization=False),
+            *discriminator_block(64, 128),
+            *discriminator_block(128, 256),
+            *discriminator_block(256, 512),
+            nn.ZeroPad2d((1, 0, 1, 0)),
+            nn.Conv2d(512, 1, 4, padding=1, bias=False),
+        )
+
+        self.globalScore = nn.Sequential(
+            *discriminator_block(in_channels * 2, 256, normalization=False),
+            *discriminator_block(256, 512),
+            *discriminator_block(512, 1),
+            nn.AdaptiveAvgPool2d(1),
+        )
+
+    def forward(self, img_A, img_B):
+        # Concatenate image and condition image by channels to produce input
+        img_input = torch.cat((img_A, img_B), 1)
+        return self.localScore(img_input), self.globalScore(img_input).view(-1, 1)
+
+
+class DPSB_MDDI(nn.Module):
+    def __init__(self, in_channels=3):
+        super(DPSB_MDDI, self).__init__()
+
+        def discriminator_block(in_filters, out_filters, normalization=True):
+            """Returns downsampling layers of each discriminator block"""
+            layers = [nn.Conv2d(in_filters, out_filters, 4, stride=2, padding=1)]
+            if normalization:
+                layers.append(nn.InstanceNorm2d(out_filters))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            return layers
+
+        self.localScore = nn.Sequential(
+            *discriminator_block(in_channels * 2, 64, normalization=False),
+            *discriminator_block(64, 128),
+            *discriminator_block(128, 256),
+            *discriminator_block(256, 512),
+            nn.ZeroPad2d((1, 0, 1, 0)),
+            nn.Conv2d(512, 1, 4, padding=1, bias=False),
+        )
+
+        self.globalScore = nn.Sequential(
+            *discriminator_block(in_channels * 2, 256, normalization=False),
+            *discriminator_block(256, 512),
+            *discriminator_block(512, 1),
+            nn.AdaptiveAvgPool2d(1),
+        )
+
+    def forward(self, img_A, img_B):
+        # a fake b true
+        img_input = torch.cat((torch.abs(img_A - img_B), img_B), 1)
+        return self.localScore(img_input), self.globalScore(img_input).view(-1, 1)

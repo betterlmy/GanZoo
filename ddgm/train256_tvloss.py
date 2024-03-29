@@ -35,14 +35,16 @@ def tv_loss(img):
     # 计算图像在垂直方向上的变化
     h_var = torch.abs(img[:, :, :-1, :] - img[:, :, 1:, :])
     # 将变化量的和作为总变异
-    return torch.sum(w_var) + torch.sum(h_var)
+    loss = torch.sum(w_var) + torch.sum(h_var)
+    batch_size, channel, height, width = img.shape
+    return loss / (batch_size * channel * height * width)
 
 
 # Losses
 criterion_GAN = torch.nn.MSELoss()
 criterion_pixelwise = torch.nn.L1Loss()
 # Loss weight of L1 pixel-wise loss between translated image and real image
-lambda_pixel = 100
+lambda_pixel = 20
 
 # Calculate output of image discriminator (PatchGAN)
 # patch = (1, train_config["img_size"] // 2**4, train_config["img_size"] // 2**4)
@@ -54,8 +56,8 @@ b_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
 b_discriminator = Discriminator(model_config["channels"])
 
 cuda = torch.cuda.is_available()
-# device = torch.device("cuda:" + train_config["gpu_id"] if cuda else "cpu")
-device = torch.device("mps")
+device = torch.device("cuda:" + train_config["gpu_id"] if cuda else "cpu")
+# device = torch.device("mps")
 if device.type != "cpu":
     db_generator = db_generator.to(device)
     db_discriminator = db_discriminator.to(device)
@@ -116,13 +118,13 @@ train_dataset, test_dataset = random_split(aapm_data, [train_size, test_size])
 
 dataloader = DataLoader(
     train_dataset,
-    batch_size=4,
+    batch_size=batch_size,
     shuffle=True,
 )
 val_dataloader = DataLoader(
     test_dataset,
-    batch_size=1,
-    shuffle=True,
+    batch_size=5,
+    shuffle=False,
 )
 
 
@@ -135,7 +137,7 @@ def train():
     prev_time = time.time()
     if use_wandb:
         wandb.init(
-            project="gans", name="ddgm-256-" + formatted_date, config=configs
+            project="gans", name="ddgm-256-TVloss-" + formatted_date, config=configs
         )
     for epoch in range(model_config["epoch"], train_config["n_epochs"]):
         for i, batch in enumerate(dataloader):
@@ -165,9 +167,8 @@ def train():
             # Pixel-wise loss
             loss_B_pixel = criterion_pixelwise(g_LDCT, trueLDCT)
             loss_tv1 = tv_loss(g_LDCT)
-            print("ganloss:", loss_GAN1.item(), "pixelloss:", loss_B_pixel.item(), "tvloss:", loss_tv1.item())
+            loss_BG = loss_GAN1 + lambda_pixel * loss_B_pixel + lambda_pixel * loss_tv1
             # Total loss
-            loss_BG = loss_GAN1 + lambda_pixel * loss_B_pixel
 
             loss_BG.backward()
             optimizer_BG.step()
@@ -209,9 +210,12 @@ def train():
 
             # Pixel-wise loss
             loss_DB_pixel = criterion_pixelwise(g_SDCT, trueSDCT)
+            loss_tv2 = tv_loss(g_SDCT)
 
             # Total loss
-            loss_DBG = loss_GAN3 + lambda_pixel * loss_DB_pixel
+            loss_DBG = (
+                loss_GAN3 + lambda_pixel * loss_DB_pixel + lambda_pixel * loss_tv2
+            )
 
             loss_DBG.backward()
             optimizer_DBG.step()
@@ -251,31 +255,36 @@ def train():
             )  # 计算剩余时间
             prev_time = time.time()
             # Print log
-            sys.stdout.write(
-                "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s"
-                % (
-                    epoch,
-                    train_config["n_epochs"],
-                    i,
-                    len(dataloader),
-                    ssim.ssim(g_SDCT, trueSDCT),
-                    psnr.psnr(g_SDCT, trueSDCT),
-                    loss_BD.item(),
-                    loss_BG.item(),
-                    loss_B_pixel.item(),
-                    loss_DBD.item(),
-                    loss_DBG.item(),
-                    loss_DB_pixel.item(),
-                    time_left,
+            if batches_done % train_config["print_interval"] == 0:
+                sys.stdout.write(
+                    "\r[Epoch %d/%d] [Batch %d/%d] [SSIM:%f][PSNR:%f][BD loss: %f] [BG loss: %f], [Bpixel: %f][DBD loss: %f] [DBG loss: %f], [DBpixel: %f] ETA: %s\n"
+                    % (
+                        epoch,
+                        train_config["n_epochs"],
+                        i,
+                        len(dataloader),
+                        ssim.ssim(g_SDCT, trueSDCT),
+                        psnr.psnr(g_SDCT, trueSDCT),
+                        loss_BD.item(),
+                        loss_BG.item(),
+                        loss_B_pixel.item(),
+                        loss_DBD.item(),
+                        loss_DBG.item(),
+                        loss_DB_pixel.item(),
+                        time_left,
+                    )
                 )
-            )
 
             # If at sample interval save image
-            if batches_done % model_config["sample_interval"] == 0:
+            if batches_done % train_config["sample_interval"] == 0:
                 outimages, ssim_score, psnr_score, rmse_score = sample_images(
                     batches_done
                 )
-                print("eval:", ssim_score, psnr_score, rmse_score)
+
+                print(
+                    "eval:%.4f,%.4f,%.4f"
+                    % (ssim_score.item(), psnr_score.item(), rmse_score.item())
+                )
                 if use_wandb:
                     wandb.log(
                         {
@@ -299,8 +308,8 @@ def train():
                     )
 
         if (
-                model_config["checkpoint_interval"] != -1
-                and epoch % model_config["checkpoint_interval"] == 0
+            train_config["checkpoint_interval"] != -1
+            and epoch % train_config["checkpoint_interval"] == 0
         ):
             print("save model %d" % epoch)
             # Save model checkpoints
