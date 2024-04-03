@@ -46,3 +46,43 @@ train_dpsb_mddi:
   print_interval: 100
   sample_interval: 2000
   use_wandb: true
+train_dpsb_mddi_notvloss:
+  batch_size: 48
+  checkpoint_interval: 2000
+  gpu_id: '6'
+  img_size: 256
+  max_nums: 4000
+  n_epochs: 200000
+  print_interval: 100
+  sample_interval: 2000
+  use_wandb: true
+train_dpsb_notvloss:
+  batch_size: 48
+  checkpoint_interval: 2000
+  gpu_id: '2'
+  img_size: 256
+  max_nums: 4000
+  n_epochs: 200000
+  print_interval: 100
+  sample_interval: 2000
+  use_wandb: true
+train_mddi:
+  batch_size: 48
+  checkpoint_interval: 2000
+  gpu_id: '5'
+  img_size: 256
+  max_nums: 4000
+  n_epochs: 200000
+  print_interval: 100
+  sample_interval: 2000
+  use_wandb: true
+train_none:
+  batch_size: 48
+  checkpoint_interval: 2000
+  gpu_id: '2'
+  img_size: 256
+  max_nums: 4000
+  n_epochs: 200000
+  print_interval: 100
+  sample_interval: 2000
+  use_wandb: true
