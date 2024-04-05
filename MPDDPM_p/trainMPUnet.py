@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
                 t.set_postfix(loss=f"{loss.item():.4f}")
 
-        if (epoch + 1) % 50 == 0 and epoch != 0:
+        if (epoch + 1) % 3 == 0 and epoch != 0:
             epoch_time = time.time() - start_time
             print(
                 f"Epoch {epoch + 1}/{num_epochs} finished, Avg Time per epoch: {epoch_time:.2f}s"

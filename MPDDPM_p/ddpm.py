@@ -1,4 +1,5 @@
-from DCUnet import *
+import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
@@ -28,21 +29,26 @@ class DCDDPM(nn.Module):
         self.seed += 1
 
     def add_noise_sample(self, x_start, t, noise=None):
-        """ Sample from q(x_t | x_0) """
+        """Sample from q(x_t | x_0)"""
         self.control_seed()
         if noise is None:
             noise = torch.randn_like(x_start)
         beta_t = self.beta_schedule[t].unsqueeze(1).unsqueeze(2).unsqueeze(3)
-        return torch.sqrt(1 - beta_t) * x_start + torch.sqrt(beta_t) * noise, torch.sqrt(beta_t) * noise
+        return (
+            torch.sqrt(1 - beta_t) * x_start + torch.sqrt(beta_t) * noise,
+            torch.sqrt(beta_t) * noise,
+        )
 
     def p_sample(self, x_t, t):
-        """ Sample from p(x_{t-1} | x_t) """
+        """Sample from p(x_{t-1} | x_t)"""
         if t == 0:
             return x_t
         else:
             beta_t = self.beta_schedule[t]
             pred_noise = self.unet(x_t)
-            mean = (1 / torch.sqrt(1 - beta_t)) * (x_t - (beta_t / torch.sqrt(1 - beta_t)) * pred_noise)
+            mean = (1 / torch.sqrt(1 - beta_t)) * (
+                x_t - (beta_t / torch.sqrt(1 - beta_t)) * pred_noise
+            )
             if t > 1:  # 如果不是最后一步，添加下一步的噪声
                 noise = torch.randn_like(x_t)
                 return mean + torch.sqrt(beta_t) * noise
@@ -59,7 +65,7 @@ class DCDDPM(nn.Module):
             return x_t
 
     def get_loss(self, x_t, scaled_noise, t):
-        """ Get loss for training """
+        """Get loss for training"""
         self.control_seed()
 
         pred_noise = self.unet(x_t)  # self.unet(x_t, t)
