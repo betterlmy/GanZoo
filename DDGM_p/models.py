@@ -192,6 +192,10 @@ class MDDI(nn.Module):
         # Concatenate image and condition image by channels to produce input
         img_input = torch.cat((torch.abs(img_A - img_B), img_B), 1)
         return self.model(img_input)
+
+
+
+
 class DPSB_MDDI(nn.Module):
     def __init__(self, in_channels=3):
         super(DPSB_MDDI, self).__init__()

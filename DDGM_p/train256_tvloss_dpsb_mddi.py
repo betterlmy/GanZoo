@@ -6,8 +6,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader, random_split
-from ddgm.datasets import ImageDatasetGPU1
-from ddgm.models import GeneratorUNet, weights_init_normal, DPSB_MDDI
+from DDGM_p.datasets import ImageDatasetGPU1
+from DDGM_p.models import GeneratorUNet, Discriminator, weights_init_normal, DPSB
 from evalution import ssim, psnr, rmse
 from utils import config
 import torch
@@ -20,7 +20,7 @@ import wandb
 config_file = "config_ddgm_256.yaml"
 configs = config.update_project_dir(config_file)
 model_config = configs["model"]["ddgm"]
-train_config = configs["train_dpsb_notvloss"]
+train_config = configs["train_dpsb_mddi"]
 use_wandb = train_config["use_wandb"]
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
 batch_size = train_config["batch_size"]
@@ -50,10 +50,10 @@ lambda_pixel = 20
 # patch = (1, train_config["img_size"] // 2**4, train_config["img_size"] // 2**4)
 patch = (1, 16, 16)
 db_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
-db_discriminator = DPSB_MDDI(model_config["channels"])
+db_discriminator = DPSB(model_config["channels"])
 
 b_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
-b_discriminator = DPSB_MDDI(model_config["channels"])
+b_discriminator = DPSB(model_config["channels"])
 
 cuda = torch.cuda.is_available()
 device = torch.device("cuda:" + train_config["gpu_id"] if cuda else "cpu")
@@ -174,7 +174,13 @@ def train():
             loss_GAN1_global = criterion_GAN(pred_fake1_global, valid_global)
             # Pixel-wise loss
             loss_B_pixel = criterion_pixelwise(g_LDCT, trueLDCT)
-            loss_BG = loss_GAN1_global + loss_GAN1 + lambda_pixel * loss_B_pixel
+            loss_tv1 = tv_loss(g_LDCT)
+            loss_BG = (
+                loss_GAN1_global
+                + loss_GAN1
+                + lambda_pixel * loss_B_pixel
+                + lambda_pixel * loss_tv1
+            )
             # Total loss
 
             loss_BG.backward()
@@ -221,9 +227,15 @@ def train():
 
             # Pixel-wise loss
             loss_DB_pixel = criterion_pixelwise(g_SDCT, trueSDCT)
+            loss_tv2 = tv_loss(g_SDCT)
 
             # Total loss
-            loss_DBG = loss_GAN3_global + loss_GAN3 + lambda_pixel * loss_DB_pixel
+            loss_DBG = (
+                loss_GAN3_global
+                + loss_GAN3
+                + lambda_pixel * loss_DB_pixel
+                + lambda_pixel * loss_tv2
+            )
 
             loss_DBG.backward()
             optimizer_DBG.step()
@@ -324,19 +336,19 @@ def train():
             # Save model checkpoints
             torch.save(
                 db_generator.state_dict(),
-                "ddgm/saved_models/256/db_generator_%d.pth" % epoch,
+                "ddgm/saved_models/256/db_generator_tv+dp+md_%d.pth" % epoch,
             )
             torch.save(
                 db_discriminator.state_dict(),
-                "ddgm/saved_models/256/db_discriminator_%d.pth" % epoch,
+                "ddgm/saved_models/256/db_discriminator_tv+dp+md_%d.pth" % epoch,
             )
             torch.save(
                 b_generator.state_dict(),
-                "ddgm/saved_models/256/b_generator_%d.pth" % epoch,
+                "ddgm/saved_models/256/b_generator_tv+dp+md_%d.pth" % epoch,
             )
             torch.save(
                 b_discriminator.state_dict(),
-                "ddgm/saved_models/256/b_discriminator_%d.pth" % epoch,
+                "ddgm/saved_models/256/b_discriminator_tv+dp+md_%d.pth" % epoch,
             )
 
 
@@ -363,7 +375,7 @@ def sample_images(batches_done):
 
     save_image(
         train_image_grid,
-        "ddgm/outputs/256/tv_dpsb_%s.png" % batches_done,
+        "ddgm/outputs/256/tv+dp+md_%s.png" % batches_done,
         nrow=5,
         normalize=True,
     )

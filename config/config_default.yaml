@@ -75,6 +75,7 @@ model:
     n_residual_blocks: 9
     sample_interval: 20
 project_dir: /root/lmy/GanZoo
+
 train:
   batch_size: 24
   gpu_id: '7'

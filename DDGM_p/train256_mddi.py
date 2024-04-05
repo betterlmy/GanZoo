@@ -6,8 +6,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader, random_split
-from ddgm.datasets import ImageDatasetGPU1
-from ddgm.models import GeneratorUNet, Discriminator, weights_init_normal
+from DDGM_p.datasets import ImageDatasetGPU1
+from DDGM_p.models import GeneratorUNet, weights_init_normal, MDDI
 from evalution import ssim, psnr, rmse
 from utils import config
 import torch
@@ -20,7 +20,7 @@ import wandb
 config_file = "config_ddgm_256.yaml"
 configs = config.update_project_dir(config_file)
 model_config = configs["model"]["ddgm"]
-train_config = configs["train"]
+train_config = configs["train_mddi"]
 use_wandb = train_config["use_wandb"]
 formatted_date = datetime.now().strftime("%m-%d-%H-%M")
 batch_size = train_config["batch_size"]
@@ -50,10 +50,10 @@ lambda_pixel = 20
 # patch = (1, train_config["img_size"] // 2**4, train_config["img_size"] // 2**4)
 patch = (1, 16, 16)
 db_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
-db_discriminator = Discriminator(model_config["channels"])
+db_discriminator = MDDI(model_config["channels"])
 
 b_generator = GeneratorUNet(model_config["channels"], model_config["channels"])
-b_discriminator = Discriminator(model_config["channels"])
+b_discriminator = MDDI(model_config["channels"])
 
 cuda = torch.cuda.is_available()
 device = torch.device("cuda:" + train_config["gpu_id"] if cuda else "cpu")
@@ -137,7 +137,9 @@ def train():
     prev_time = time.time()
     if use_wandb:
         wandb.init(
-            project="gans", name="ddgm-256-TVloss-" + formatted_date, config=configs
+            project="gans",
+            name="ddgm-256-mddi-" + formatted_date,
+            config=configs,
         )
     for epoch in range(model_config["epoch"], train_config["n_epochs"]):
         for i, batch in enumerate(dataloader):
@@ -153,6 +155,12 @@ def train():
             fake = torch.zeros(
                 (trueLDCT.size(0), *patch), dtype=torch.float32, requires_grad=False
             ).to(device)
+            valid_global = torch.ones(
+                (trueLDCT.size(0), 1), dtype=torch.float32, requires_grad=False
+            ).to(device)
+            fake_global = torch.zeros(
+                (trueLDCT.size(0), 1), dtype=torch.float32, requires_grad=False
+            ).to(device)
 
             # BGAN的训练使用到模拟的LDCT和真实的LDCT  学习模拟的LDCT到真实LDCT的映射关系 因此
             b_generator.train()
@@ -163,11 +171,9 @@ def train():
             g_LDCT = b_generator(fakeLDCT)  # 给出加噪得到的LDCT图像 用来模拟真实的LDCT
             pred_fake1 = b_discriminator(g_LDCT, fakeLDCT)
             loss_GAN1 = criterion_GAN(pred_fake1, valid)
-
             # Pixel-wise loss
             loss_B_pixel = criterion_pixelwise(g_LDCT, trueLDCT)
-            loss_tv1 = tv_loss(g_LDCT)
-            loss_BG = loss_GAN1 + lambda_pixel * loss_B_pixel + lambda_pixel * loss_tv1
+            loss_BG = loss_GAN1 + lambda_pixel * loss_B_pixel
             # Total loss
 
             loss_BG.backward()
@@ -182,7 +188,6 @@ def train():
             # Real loss
             pred_real2 = b_discriminator(fakeLDCT, trueLDCT)
             loss_real2 = criterion_GAN(pred_real2, valid)
-
             # Fake loss
             pred_fake2 = b_discriminator(g_LDCT.detach(), fakeLDCT)
             loss_fake2 = criterion_GAN(pred_fake2, fake)
@@ -210,12 +215,9 @@ def train():
 
             # Pixel-wise loss
             loss_DB_pixel = criterion_pixelwise(g_SDCT, trueSDCT)
-            loss_tv2 = tv_loss(g_SDCT)
 
             # Total loss
-            loss_DBG = (
-                loss_GAN3 + lambda_pixel * loss_DB_pixel + lambda_pixel * loss_tv2
-            )
+            loss_DBG = loss_GAN3 + lambda_pixel * loss_DB_pixel
 
             loss_DBG.backward()
             optimizer_DBG.step()
@@ -229,13 +231,10 @@ def train():
             # Real loss
             pred_real4 = db_discriminator(trueSDCT, ULDCT)
             loss_real4 = criterion_GAN(pred_real4, valid)
-            # loss_real4.retain_graph=True
 
             # Fake loss
             pred_fake4 = db_discriminator(g_SDCT.detach(), ULDCT)
             loss_fake4 = criterion_GAN(pred_fake4, fake)
-            # loss_fake4.retain_graph=True
-
             # Total loss
             loss_DBD = 0.5 * (loss_real4 + loss_fake4)
 
@@ -315,19 +314,19 @@ def train():
             # Save model checkpoints
             torch.save(
                 db_generator.state_dict(),
-                "ddgm/saved_models/256/db_generator_%d.pth" % epoch,
+                "ddgm/saved_models/256/db_generator_+dp+md_%d.pth" % epoch,
             )
             torch.save(
                 db_discriminator.state_dict(),
-                "ddgm/saved_models/256/db_discriminator_%d.pth" % epoch,
+                "ddgm/saved_models/256/db_discriminator_+dp+md_%d.pth" % epoch,
             )
             torch.save(
                 b_generator.state_dict(),
-                "ddgm/saved_models/256/b_generator_%d.pth" % epoch,
+                "ddgm/saved_models/256/b_generator_+dp+md_%d.pth" % epoch,
             )
             torch.save(
                 b_discriminator.state_dict(),
-                "ddgm/saved_models/256/b_discriminator_%d.pth" % epoch,
+                "ddgm/saved_models/256/b_discriminator_+dp+md_%d.pth" % epoch,
             )
 
 
@@ -354,7 +353,7 @@ def sample_images(batches_done):
 
     save_image(
         train_image_grid,
-        "ddgm/outputs/256/%s.png" % batches_done,
+        "ddgm/outputs/256/dp+md_%s.png" % batches_done,
         nrow=5,
         normalize=True,
     )
