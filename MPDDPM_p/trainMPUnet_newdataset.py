@@ -34,7 +34,7 @@ if __name__ == "__main__":
     low_dir = "B301MM/low"
     max_nums = 1000
     aapm_data = ImageDatasetGPU1(
-        os.path.join("aapm256"),
+        os.path.join("/Users/zane/PycharmProjects/GanZoo/dataset/B301MM"),
         transforms_=transform,
         device=device,
         max_nums=max_nums,
