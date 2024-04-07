@@ -5,14 +5,16 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 
-class DCDDPM(nn.Module):
+class DCDDIM(nn.Module):
     def __init__(self, unet_model, beta_schedule="dns", T=1000):
-        super(DCDDPM, self).__init__()
+        super(DCDDIM, self).__init__()
         self.seed = 1
         self.unet = unet_model
         self.T = T  # Number of diffusion steps
         self.beta_schedule = self._get_beta_schedule(beta_schedule, T).to(self.unet.device)
-
+        self.alpha_ts = self._compute_alpha_ts(T)
+        print("beta_schedule:", self.beta_schedule.size())
+        print("alpha_ts:", self.alpha_ts.size())
     def _get_beta_schedule(self, schedule, T, beta_start=0.0001, beta_end=0.1):
         if schedule == "linear":
             return torch.linspace(beta_start, beta_end, T)
@@ -28,8 +30,14 @@ class DCDDPM(nn.Module):
         else:
             raise ValueError("Unknown beta schedule")
 
-    @abstractmethod
-    def generate_DNS_schedule(self, T, low, high, off=5):
+    def _compute_alpha_ts(self, T):
+        """Precompute alpha values for all time steps."""
+        alphas = torch.cumprod(1 - self.beta_schedule, dim=0)
+        alphas = alphas.unsqueeze(1).unsqueeze(2).unsqueeze(3)  # Add necessary dims for image processing
+        return alphas
+
+    @staticmethod
+    def generate_DNS_schedule(T, low, high, off=5):
         # Dynamic negative square.
         print("generate_DNS_schedule, T =", off)
         t = [value for value in range(0, T)]
@@ -47,15 +55,14 @@ class DCDDPM(nn.Module):
         self.seed += 1
 
     def add_noise_sample(self, x_start, t, noise=None):
-        """Sample from q(x_t | x_0)"""
-        self.control_seed()
+        """Modify to compute noise based on both the current and initial state."""
         if noise is None:
-            noise = torch.randn_like(x_start)  # 默认噪声是正态分布
-        beta_t = self.beta_schedule[t].unsqueeze(1).unsqueeze(2).unsqueeze(3)
-        return (
-            torch.sqrt(1 - beta_t) * x_start + torch.sqrt(beta_t) * noise,
-            torch.sqrt(beta_t) * noise,
-        )
+            noise = torch.randn_like(x_start)  # Default noise remains normal distribution
+        print("t:", t)
+        alpha_t = torch.cumprod(1 - self.beta_schedule[:t + 1], dim=0)[-1]
+
+        alpha_t = alpha_t.unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        return torch.sqrt(alpha_t) * x_start + torch.sqrt(1 - alpha_t) * noise, noise
 
     def p_sample(self, x_t, t):
         """Sample from p(x_{t-1} | x_t)"""
@@ -73,36 +80,40 @@ class DCDDPM(nn.Module):
             else:
                 return mean
 
-    def reverse_diffusion(self, x_start, t):
+    def reverse_diffusion(self, x_start, x_original, num_steps=100):
+        """Incorporate x_original into the reverse diffusion process without using beta_t."""
         with torch.no_grad():
             self.eval()
             x_t = x_start
-            if t == None:
-                t = self.T
-            for t in tqdm(reversed(range(t)), desc="Reverse diffusion"):
-                x_t = self.p_sample(x_t, t)
+            for i in reversed(range(num_steps)):
+                t = torch.full((x_start.size(0),), i, device=self.unet.device, dtype=torch.long)
+                alpha_t = torch.cumprod(1 - self.beta_schedule[:t + 1], dim=0)[-1]
+                alpha_t = alpha_t.unsqueeze(1).unsqueeze(2).unsqueeze(3)
+                pred_noise = self.unet(x_t)
+                # Calculate mu_t using alpha_t only
+                mu_t = (x_t - torch.sqrt(1 - alpha_t) * pred_noise) / torch.sqrt(alpha_t)
+                if i > 0:
+                    x_t = mu_t + torch.sqrt(alpha_t * (1 - alpha_t)) * torch.randn_like(x_t)
+                else:
+                    x_t = mu_t
             self.train()
             return x_t
 
     def forward(self, x_start, x_high):
-        self.control_seed()
-        t = torch.randint(0, self.T, (x_start.size(0),), device=self.unet.device)
-        x_t, scaled_noise = self.add_noise_sample(x_start, t)  # 得到前向加噪的图像和噪声
-        pred_noise = self.unet(x_t)  # self.unet(x_t, t)
+        """Assume initial noisy state is generated in the forward process."""
+        noise = torch.randn_like(x_start)
+        x_noisy, _ = self.add_noise_sample(x_start, self.T, noise)
+        x_reconstructed = self.reverse_diffusion(x_noisy, x_start, num_steps=50)
+        loss = F.mse_loss(x_reconstructed, x_high, reduction='mean')
 
-        pred_x_0 = self.reverse_diffusion(x_t, t)
-        loss_noise = F.mse_loss(pred_noise, scaled_noise, reduction="sum")
-        loss_content = F.mse_loss(pred_x_0, x_high, reduction="sum")
-        print(loss_noise, loss_content)
-        return loss_noise / (x_t.size(0) * x_t.size(1) * x_t.size(2) * x_t.size(3)), loss_content / (
-                x_t.size(0) * x_t.size(1) * x_t.size(2) * x_t.size(3))
+        return x_reconstructed, loss
 
 
 if __name__ == "__main__":
     from mpunet import MPUnet
 
     unet_model = MPUnet(in_channels=1, out_channels=1, device="mps")
-    model = DCDDPM(unet_model)
-    x = torch.randn(1, 1, 224, 224).to("mps")
-    x2 = torch.randn(1, 1, 224, 224).to("mps")
-    print(model(x, x2))
+    model = DCDDIM(unet_model)
+    # x = torch.randn(1, 1, 224, 224).to("mps")
+    # x2 = torch.randn(1, 1, 224, 224).to("mps")
+    # print(model(x, x2))
