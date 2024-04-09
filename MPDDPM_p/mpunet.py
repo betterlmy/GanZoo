@@ -19,7 +19,7 @@ class DoubleConv(nn.Sequential):
             nn.ReLU(inplace=True),
             nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
         )
 
 
@@ -28,8 +28,7 @@ class Down(nn.Sequential):
 
     def __init__(self, in_channels, out_channels):
         super(Down, self).__init__(
-            nn.MaxPool2d(2, stride=2),
-            DoubleConv(in_channels, out_channels)
+            nn.MaxPool2d(2, stride=2), DoubleConv(in_channels, out_channels)
         )
 
 
@@ -37,10 +36,12 @@ class Up(nn.Module):
     def __init__(self, in_channels, out_channels, bilinear=True):
         super(Up, self).__init__()
         if bilinear:
-            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+            self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
             self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
         else:
-            self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
+            self.up = nn.ConvTranspose2d(
+                in_channels, in_channels // 2, kernel_size=2, stride=2
+            )
             self.conv = DoubleConv(in_channels, out_channels)
 
     def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
@@ -50,8 +51,9 @@ class Up(nn.Module):
         diff_x = x2.size()[3] - x1.size()[3]
 
         # padding_left, padding_right, padding_top, padding_bottom
-        x1 = F.pad(x1, [diff_x // 2, diff_x - diff_x // 2,
-                        diff_y // 2, diff_y - diff_y // 2])
+        x1 = F.pad(
+            x1, [diff_x // 2, diff_x - diff_x // 2, diff_y // 2, diff_y - diff_y // 2]
+        )
 
         x = torch.cat([x2, x1], dim=1)
         x = self.conv(x)
@@ -102,19 +104,27 @@ class Encoder(nn.Module):
         dpr = [x.item() for x in torch.linspace(0, 0.1, 8)]
 
         cur = 0
-        self.transformer_down1 = nn.ModuleList([AttentionBlock(32, 1, 8, dpr[cur + i]) for i in range(2)])
+        self.transformer_down1 = nn.ModuleList(
+            [AttentionBlock(32, 1, 8, dpr[cur + i]) for i in range(2)]
+        )
         self.norm1 = nn.LayerNorm(32)
 
         cur += 2
-        self.transformer_down2 = nn.ModuleList([AttentionBlock(64, 2, 4, dpr[cur + i]) for i in range(2)])
+        self.transformer_down2 = nn.ModuleList(
+            [AttentionBlock(64, 2, 4, dpr[cur + i]) for i in range(2)]
+        )
         self.norm2 = nn.LayerNorm(64)
         cur += 2
 
-        self.transformer_down3 = nn.ModuleList([AttentionBlock(128, 4, 2, dpr[cur + i]) for i in range(2)])
+        self.transformer_down3 = nn.ModuleList(
+            [AttentionBlock(128, 4, 2, dpr[cur + i]) for i in range(2)]
+        )
         self.norm3 = nn.LayerNorm(128)
 
         cur += 2
-        self.transformer_down4 = nn.ModuleList([AttentionBlock(256, 8, 1, dpr[cur + i]) for i in range(2)])
+        self.transformer_down4 = nn.ModuleList(
+            [AttentionBlock(256, 8, 1, dpr[cur + i]) for i in range(2)]
+        )
         self.norm4 = nn.LayerNorm(256)
 
         self.patch_embed2 = PatchEmbed(64, 128, 3, 2)
@@ -130,22 +140,32 @@ class Encoder(nn.Module):
 
         for block in self.transformer_down2:
             x2_transformer = block(x2_transformer, H, W)
-        x2_transformer = self.norm2(x2_transformer).reshape(B, H, W, -1).permute(0, 3, 1, 2)  # ([1, 64, 128, 128])
+        x2_transformer = (
+            self.norm2(x2_transformer).reshape(B, H, W, -1).permute(0, 3, 1, 2)
+        )  # ([1, 64, 128, 128])
 
         x3 = self.down2(x2)  # x3.shape torch.Size([1, 128, 64, 64])
         B, C, H, W = x3.shape
 
-        x3_transformer = x3.flatten(2).transpose(1, 2) + self.patch_embed2(x2_transformer)[0]
+        x3_transformer = (
+            x3.flatten(2).transpose(1, 2) + self.patch_embed2(x2_transformer)[0]
+        )
         for block in self.transformer_down3:
             x3_transformer = block(x3_transformer, H, W)
-        x3_transformer = self.norm3(x3_transformer).reshape(B, H, W, -1).permute(0, 3, 1, 2)  # ([1, 128, 64, 64])
+        x3_transformer = (
+            self.norm3(x3_transformer).reshape(B, H, W, -1).permute(0, 3, 1, 2)
+        )  # ([1, 128, 64, 64])
 
         x4 = self.down3(x3)  # x4.shape torch.Size([1, 256, 32, 32])
         B, C, H, W = x4.shape
-        x4_transformer = x4.flatten(2).transpose(1, 2) + self.patch_embed3(x3_transformer)[0]
+        x4_transformer = (
+            x4.flatten(2).transpose(1, 2) + self.patch_embed3(x3_transformer)[0]
+        )
         for block in self.transformer_down4:
             x4_transformer = block(x4_transformer, H, W)
-        x4_transformer = self.norm4(x4_transformer).reshape(B, H, W, -1).permute(0, 3, 1, 2)  # ([1, 256, 32, 32])
+        x4_transformer = (
+            self.norm4(x4_transformer).reshape(B, H, W, -1).permute(0, 3, 1, 2)
+        )  # ([1, 256, 32, 32])
 
         x4 = x4 + x4_transformer
         x5 = self.down4(x4)  # x5.shape torch.Size([1, 256, 16, 16])
@@ -156,7 +176,7 @@ class MPUnet(nn.Module):
     def __init__(self, in_channels, out_channels, device=None):
         super(MPUnet, self).__init__()
 
-        self.encoder = Encoder(in_channels)
+        self.encoder = Encoder(in_channels * 2)
         self.decoder = Decoder(num_classes=out_channels)
         self.device = "cpu"
         if device is not None:
@@ -164,12 +184,26 @@ class MPUnet(nn.Module):
             self.encoder.to(device)
             self.decoder.to(device)
 
+    def sobel(self, image):
+        sobel_x = torch.tensor(
+            [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]]
+        ).view(1, 1, 3, 3).to(self.device)
+        sobel_y = torch.tensor(
+            [[-1.0, -2.0, -1.0], [0.0, 0.0, 0.0], [1.0, 2.0, 1.0]]
+        ).view(1, 1, 3, 3).to(self.device)
+        edge_x = F.conv2d(image, sobel_x, padding=1)
+        edge_y = F.conv2d(image, sobel_y, padding=1)
+        sobel = torch.sqrt(edge_x**2 + edge_y**2)
+
+        return sobel
+
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
-        x = self.encoder(x)
+        sobelX = self.sobel(x)
+        x = self.encoder(torch.cat((x, sobelX), dim=1))
         return self.decoder(x)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     x = torch.randn(1, 1, 256, 256)
     model = MPUnet(in_channels=1, out_channels=1)
 

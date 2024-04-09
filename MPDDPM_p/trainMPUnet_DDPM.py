@@ -1,45 +1,40 @@
-import os
-
+import os, sys
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from datasets import ImageDatasetGPU1
 from ddpm import DCDDPM
-from torchvision import transforms
 from mpunet import *
 import time
 import torch
 from tqdm import tqdm
 from sample import sample
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from evalution import rmse, ssim, psnr
+
 if __name__ == "__main__":
     device = torch.device("cpu")
     if torch.cuda.is_available():
         # 获取 GPU 数量
         print(f"CUDA 可用")
-        device = torch.device(f"cuda:5")
+        device = torch.device(f"cuda:6")
     print("当前正在使用设备:", device)
 
     # 超参数设置
     learning_rate = 1e-4
-    batch_size = 32
+    batch_size = 16
     num_epochs = 1000
 
-    transform = transforms.Compose(
-        [
-            transforms.Resize((224, 224)),  # 或其他您需要的大小
-            transforms.ToTensor(),
-        ]
-    )
     high_dir = "B301MM/high"
     low_dir = "B301MM/low"
-    max_nums = 1000
+    max_nums = 30
     aapm_data = ImageDatasetGPU1(
-        os.path.join("/Users/zane/PycharmProjects/GanZoo/dataset/B301MM"),
-        transforms_=transform,
+        os.path.join("/root/lmy/GanZoo/MPDDPM_p/B301MM"),
         device=device,
-        max_nums=max_nums,
+        # max_nums=max_nums,
     )
-
+    ckpt_save_iter = 100
     train_size = int(0.9 * len(aapm_data))
     test_size = len(aapm_data) - train_size
 
@@ -50,6 +45,7 @@ if __name__ == "__main__":
         batch_size=batch_size,
         shuffle=True,
     )
+
     val_dataloader = DataLoader(
         test_dataset,
         batch_size=5,
@@ -59,6 +55,7 @@ if __name__ == "__main__":
     # 模型初始化
     unet_model = MPUnet(in_channels=1, out_channels=1, device=device)
     model = DCDDPM(unet_model).to(device)
+    print("模型初始化完成")
 
     # 损失函数和优化器
     criterion = nn.MSELoss()
@@ -70,14 +67,25 @@ if __name__ == "__main__":
 
         with tqdm(train_loader, desc=f"Epoch {epoch + 1}/{num_epochs}") as t:
             for high_img, low_img in t:
-                loss = model(low_img.to(device))
+                pred_x_0, pred_noise, scaled_noise = model(low_img)
+                loss_noise = F.mse_loss(pred_noise, scaled_noise)
+                loss_content = F.mse_loss(pred_x_0, high_img)
+                loss = (loss_noise + loss_content) / high_img.size(0)
+
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                with torch.no_grad():
+                    psnr_score = psnr.psnr(pred_x_0, high_img)
+                    ssim_score = ssim.ssim(pred_x_0, high_img)
+                    # rmse_score = rmse(pred_x_0, high_img)
+                    t.set_postfix(
+                        loss=f"{loss.item():.4f}",
+                        psnr=f"{psnr_score:.4f}",
+                        ssim=f"{ssim_score:.4f}",
+                    )
 
-                t.set_postfix(loss=f"{loss.item():.4f}")
-
-        if (epoch + 1) % 3 == 0 and epoch != 0:
+        if (epoch + 1) % ckpt_save_iter == 0 and epoch != 0:
             epoch_time = time.time() - start_time
             print(
                 f"Epoch {epoch + 1}/{num_epochs} finished, Avg Time per epoch: {epoch_time:.2f}s"

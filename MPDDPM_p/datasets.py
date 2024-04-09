@@ -18,12 +18,12 @@ import re
 class ImageDatasetGPU1(Dataset):
 
     def __init__(
-            self,
-            rootA,
-            transforms_=None,
-            device="cuda",
-            max_nums=0,
-            max_workers=100,
+        self,
+        rootA,
+        transforms_=None,
+        device="cuda",
+        max_nums=0,
+        max_workers=100,
     ):
         if transforms_ is None:
             transforms_ = [
@@ -74,10 +74,18 @@ class ImageDatasetGPU1(Dataset):
         self.TrueLDCTs.append(TrueLDCT)
 
     def __getitem__(self, index):
-        return {
-            "TrueSDCT": self.TrueSDCTs[index],
-            "TrueLDCT": self.TrueLDCTs[index],
-        }
+        # image_A = Image.open(self.files_A[index % len(self.files_A)])
+        # image_B = Image.open(self.files_B[index % len(self.files_B)])
+        # image_A = image_A.convert("L")
+        # image_B = image_B.convert("L")
+        # TrueSDCT = self.transform(image_A)
+        # TrueLDCT = self.transform(image_B)
+        # return {
+        #     TrueSDCT,
+        #     TrueLDCT,
+        # }
+        return self.TrueSDCTs[index],self.TrueLDCTs[index]
+        
 
     def __len__(self):
         return self.max_nums
@@ -85,9 +93,9 @@ class ImageDatasetGPU1(Dataset):
 
 class GeneDataset(Dataset):
     def __init__(
-            self,
-            root,
-            transforms_,
+        self,
+        root,
+        transforms_,
     ):
         self.transforms_ = transforms.Compose(transforms_)
         files = glob.glob(os.path.join(root) + "/*.png")
@@ -99,8 +107,8 @@ class GeneDataset(Dataset):
             if number:
                 return int(number.group())  # 返回数字部分转换成的整数
             return 0  # 如果没有找到数字，返回0
-        self.files_A = sorted(files, key=extract_number)
 
+        self.files_A = sorted(files, key=extract_number)
 
     def __getitem__(self, index):
         image_A = Image.open(self.files_A[index % len(self.files_A)])

@@ -17,10 +17,10 @@ class DoubleConv(nn.Module):
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(mid_channels),
-            ACTIVATION_FUNCTION(inplace=True),
+            ACTIVATION_FUNCTION(),
             nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
-            ACTIVATION_FUNCTION(inplace=True)
+            ACTIVATION_FUNCTION()
         )
 
     def forward(self, x):
@@ -52,7 +52,7 @@ class Down(nn.Module):
             self.down = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1),
                 nn.BatchNorm2d(out_channels),
-                ACTIVATION_FUNCTION(inplace=True),
+                ACTIVATION_FUNCTION(),
                 DoubleConv(out_channels, out_channels)
             )
 
@@ -126,7 +126,7 @@ class DualChannelUnet(nn.Module):
         self.up3 = Up(256, 128 // factor, bilinear)
         self.up4 = Up(128, 64, bilinear)
         self.outc = OutConv(64, out_channels)
-        self.to(self.device)
+
 
     def forward(self, x):
         x1 = self.inc(x)
