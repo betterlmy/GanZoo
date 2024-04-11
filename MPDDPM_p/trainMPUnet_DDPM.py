@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     # 超参数设置
     learning_rate = 1e-4
-    batch_size = 16
+    batch_size = 1
     num_epochs = 1000
 
     high_dir = "B301MM/high"

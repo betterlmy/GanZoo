@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 
 class DCDDPM(nn.Module):
-    def __init__(self, unet_model, beta_schedule="dns", T=100):
+    def __init__(self, unet_model, beta_schedule="dns", T=50):
         super(DCDDPM, self).__init__()
         self.seed = 1
         self.unet = unet_model
@@ -47,7 +47,7 @@ class DCDDPM(nn.Module):
 
     def control_seed(self):
         torch.manual_seed(self.seed)
-        self.seed += 1
+        self.seed = self.seed + 1
 
     def add_noise_sample(self, x_start, t, noise=None):
         """Sample from q(x_t | x_0)"""
@@ -97,33 +97,26 @@ class DCDDPM(nn.Module):
         noise = torch.randn_like(x_t)
         sqrt_beta_t = torch.sqrt(beta_t)
         noisy_mean = mean + sqrt_beta_t * noise
-        result = mean.clone()  # 创建mean的一个副本以避免修改原始数据
         mask = t > 1  # 创建一个布尔掩码，表示哪些元素的时间步大于1
-        result[mask] = noisy_mean[mask]
-        return result
+        mean[mask] = noisy_mean[mask]
+        return mean
 
     def reverse_diffusion(self, x_start, t):
-        with torch.no_grad():
-            self.eval()
-
-            x_t = x_start
-            if t == None:
-                t = torch.full(
-                    (x_start.size(0),),
-                    self.T,
-                    dtype=torch.long,
-                    device=x_start.device,
-                )  # 为每个样本创建一个全是self.T的Tensor
-            for current_t in reversed(range(1, self.T + 1)):
-                mask = t >= current_t  # 找出所有当前需要处理的样本
-                if mask.any():
-                    x_t[mask] = self.p_sample_batch(
-                        x_t[mask], torch.full_like(t[mask], current_t, device=t.device)
-                    )
-
-            # x_t = self.p_sample_batch(x_t, t)
-            self.train()
-            return x_t
+        x_t = x_start
+        if t == None:
+            t = torch.full(
+                (x_start.size(0),),
+                self.T,
+                dtype=torch.long,
+                device=self.device,
+            )  # 为每个样本创建一个全是self.T的Tensor
+        for current_t in reversed(range(1, self.T + 1)):
+            mask = t >= current_t  # 找出所有当前需要处理的样本
+            if mask.any():
+                x_t[mask] = self.p_sample_batch(
+                    x_t[mask], torch.full_like(t[mask], current_t, device=self.device)
+                )
+        return x_t
 
     def forward(self, x_start, t=None):
         self.control_seed()
@@ -134,16 +127,19 @@ class DCDDPM(nn.Module):
             x_start, t
         )  # 得到前向加噪的图像和噪声
         pred_noise = self.unet(x_t)  # self.unet(x_t, t)
+        # pred_x_0 = self.reverse_diffusion(x_t, t)  # 推理的高清图像
+        return x_t, t, pred_noise, scaled_noise
 
+    def pred(self, x_t, t=None):
         pred_x_0 = self.reverse_diffusion(x_t, t)
-        return pred_x_0, pred_noise, scaled_noise
+        return pred_x_0
 
 
 if __name__ == "__main__":
     from mpunet import MPUnet
 
-    unet_model = MPUnet(in_channels=1, out_channels=1, device="mps")
+    unet_model = MPUnet(in_channels=1, out_channels=1, device="cpu")
     model = DCDDPM(unet_model)
-    x = torch.randn(1, 1, 224, 224).to("mps")
-    x2 = torch.randn(1, 1, 224, 224).to("mps")
+    x = torch.randn(1, 1, 224, 224).to("cpu")
+    x2 = torch.randn(1, 1, 224, 224).to("cpu")
     print(model(x, x2))

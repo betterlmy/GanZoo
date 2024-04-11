@@ -3,11 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchsummary
 
-ACTIVATION_FUNCTION = nn.ReLU
+
 
 
 class DoubleConv(nn.Module):
     """双重卷积使用两个卷积层可以在某种程度上减缓这种信息损失，因为第二层有机会重新强调第一层中可能被弱化的重要特征。"""
+
     """ (Convolution => [BatchNorm] => ReLU) * 2 """
 
     def __init__(self, in_channels, out_channels, mid_channels=None):
@@ -17,10 +18,10 @@ class DoubleConv(nn.Module):
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(mid_channels),
-            ACTIVATION_FUNCTION(),
+            nn.ReLU(inplace=True),
             nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
-            ACTIVATION_FUNCTION()
+            nn.ReLU(inplace=True),
         )
 
     def forward(self, x):
@@ -29,6 +30,7 @@ class DoubleConv(nn.Module):
 
 class Down(nn.Module):
     """下采样是减少图像分辨率的过程，它有助于网络在更深的层次上捕获更广泛和更抽象的特征。这对于理解图像的整体结构和上下文非常重要。"""
+
     """ Downscaling with maxpool then double conv """
     """下采样可以选择池化操作,也可以使用卷积操作"""
     """
@@ -42,18 +44,19 @@ class Down(nn.Module):
     3.参数数量增加：由于卷积层包含可学习的参数，使用步长为2的卷积进行下采样会增加模型的参数数量。
     """
 
-    def __init__(self, in_channels, out_channels, down_type='maxpool'):
+    def __init__(self, in_channels, out_channels, down_type="maxpool"):
         super().__init__()
         self.down = nn.Sequential(
-            nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
+            nn.MaxPool2d(2), DoubleConv(in_channels, out_channels)
         )
-        if down_type != 'maxpool':
+        if down_type != "maxpool":
             self.down = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1),
+                nn.Conv2d(
+                    in_channels, out_channels, kernel_size=3, stride=2, padding=1
+                ),
                 nn.BatchNorm2d(out_channels),
-                ACTIVATION_FUNCTION(),
-                DoubleConv(out_channels, out_channels)
+                nn.ReLU(inplace=True),
+                DoubleConv(out_channels, out_channels),
             )
 
     def forward(self, x):
@@ -61,7 +64,8 @@ class Down(nn.Module):
 
 
 class Up(nn.Module):
-    """ Upscaling then double conv """
+    """Upscaling then double conv"""
+
     """
     在Unet网络中，上采样模块是解码器部分的核心组件。
     它的主要作用是将经过编码器（Encoder）部分的下采样（Downsampling）和特征提取后的压缩特征图（Feature Map）逐步恢复到原始图像的尺寸。
@@ -73,10 +77,12 @@ class Up(nn.Module):
 
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
-            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+            self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
             self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
         else:
-            self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
+            self.up = nn.ConvTranspose2d(
+                in_channels, in_channels // 2, kernel_size=2, stride=2
+            )
             self.conv = DoubleConv(in_channels, out_channels)
 
     def forward(self, x1, x2):
@@ -90,11 +96,10 @@ class Up(nn.Module):
         diffY = x2.size()[2] - x1.size()[2]
         diffX = x2.size()[3] - x1.size()[3]
 
-        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
-                        diffY // 2, diffY - diffY // 2])
+        x3 = F.pad(x1, [diffX // 2, diffX - diffX // 2, diffY // 2, diffY - diffY // 2])
         # if you have padding issues, see
         # https://github.com/milesial/Pytorch-UNet/issues/18
-        x = torch.cat([x2, x1], dim=1)
+        x = torch.cat([x2, x3], dim=1)
         return self.conv(x)
 
 
@@ -134,15 +139,31 @@ class DualChannelUnet(nn.Module):
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         x5 = self.down4(x4)
-        x = self.up1(x5, x4)
-        x = self.up2(x, x3)
-        x = self.up3(x, x2)
-        x = self.up4(x, x1)
-        logits = self.outc(x)
+        x_4 = self.up1(x5, x4)
+        x_3 = self.up2(x_4, x3)
+        x_2 = self.up3(x_3, x2)
+        x_1 = self.up4(x_2, x1)
+        logits = self.outc(x_1)
         return logits
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # 用于测试网络结构是否正确
-    model = DualChannelUnet(2, 1)
-    torchsummary.summary(model, (2, 224, 224))
+    device = torch.device(f"cuda:6")
+    pred = torch.randn(16, 1, 256, 256).to(device)
+    model = DualChannelUnet(1, 1, "cpu").to(device)
+
+    x = torch.randn(16, 1, 256, 256).to(device)
+    y = model(x)
+    import torch.optim as optim
+
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.1)
+
+    loss = criterion(y, pred)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    print(y.shape)
+    # torchsummary.summary(model, (2, 224, 224),device='cpu')

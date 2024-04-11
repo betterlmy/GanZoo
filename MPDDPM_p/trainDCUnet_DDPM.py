@@ -11,7 +11,7 @@ from sample import sample
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from evalution import ssim, psnr
+from evalution import rmse, ssim, psnr
 
 if __name__ == "__main__":
     device = torch.device("cpu")
@@ -23,16 +23,16 @@ if __name__ == "__main__":
 
     # 超参数设置
     learning_rate = 1e-4
-    batch_size = 16
+    batch_size = 2
     num_epochs = 1000
-    
+
     high_dir = "B301MM/high"
     low_dir = "B301MM/low"
     max_nums = 30
     aapm_data = ImageDatasetGPU1(
         os.path.join("/root/lmy/GanZoo/MPDDPM_p/B301MM"),
         device=device,
-        # max_nums=max_nums,
+        max_nums=max_nums,
     )
     ckpt_save_iter = 100
     train_size = int(0.9 * len(aapm_data))
@@ -53,29 +53,34 @@ if __name__ == "__main__":
     )
 
     # 模型初始化
-    unet = DualChannelUnet(in_channels=1, out_channels=1, device=device)
-    model = DCDDPM(unet).to(device)
+    unet_model = DualChannelUnet(in_channels=1, out_channels=1, device=device)
+    model = DCDDPM(unet_model).to(device)
     print("模型初始化完成")
 
     # 损失函数和优化器
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    torch.autograd.set_detect_anomaly(True)
-    torch.backends.cudnn.benchmark = True
+
     # 训练循环
     for epoch in range(num_epochs):
         start_time = time.time()
 
         with tqdm(train_loader, desc=f"Epoch {epoch + 1}/{num_epochs}") as t:
             for high_img, low_img in t:
-                pred_x_0, pred_noise, scaled_noise = model(low_img)
+                xt, t1, pred_noise, scaled_noise = model(low_img)
                 loss_noise = F.mse_loss(pred_noise, scaled_noise)
-                loss_content = F.mse_loss(pred_x_0, high_img)
-                loss = (loss_noise + loss_content) / high_img.size(0)
-
                 optimizer.zero_grad()
-                loss.backward()
+                loss_noise.backward()
                 optimizer.step()
+                if t1.any() > 0:
+                    pred_x_0 = model.pred(xt, t1)
+                    loss_content = F.mse_loss(pred_x_0, high_img)
+                    optimizer.zero_grad()
+                    loss_content.backward()
+                    optimizer.step()
+
+                    loss = (loss_noise + loss_content) / high_img.size(0)
+
                 with torch.no_grad():
                     psnr_score = psnr.psnr(pred_x_0, high_img)
                     ssim_score = ssim.ssim(pred_x_0, high_img)
